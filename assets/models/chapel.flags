@@ -1,1 +1,1 @@
--m assets/materials/static.skm.yaml --default-material default
+-m assets/materials/static.skm.yaml --default-material vertex_lit
