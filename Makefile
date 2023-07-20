@@ -109,20 +109,20 @@ build/%.fbx: %.blend
 	@mkdir -p $(@D)
 	$(BLENDER_3_0) $< --background --python tools/export_fbx.py -- $@
 
-# build/assets/test_chambers/%.h build/assets/test_chambers/%_geo.c build/assets/test_chambers/%_anim.c: build/assets/test_chambers/%.fbx build/assets/materials/static.h $(SKELATOOL64) $(TEXTURE_IMAGES) $(LUA_FILES)
-# 	$(SKELATOOL64) --script tools/export_level.lua --fixed-point-scale ${SCENE_SCALE} --model-scale 0.01 --name $(<:build/assets/test_chambers/%.fbx=%) -m assets/materials/static.skm.yaml -o $(<:%.fbx=%.h) $<
+build/assets/world/%.h build/assets/world/%_geo.c: build/assets/world/%.fbx build/assets/materials/static.h $(SKELATOOL64) $(TEXTURE_IMAGES) $(LUA_FILES)
+	$(SKELATOOL64) --script tools/export_level.lua --fixed-point-scale ${SCENE_SCALE} --model-scale 0.01 --name $(<:build/assets/world/%.fbx=%) -m assets/materials/static.skm.yaml -o $(<:%.fbx=%.h) $<
 
-# build/assets/test_chambers/%.o: build/assets/test_chambers/%.c build/assets/materials/static.h
-# 	@mkdir -p $(@D)
-# 	$(CC) $(CFLAGS) -MM $^ -MF "$(@:.o=.d)" -MT"$@"
-# 	$(CC) $(CFLAGS) -c -o $@ $<
+build/assets/world/%.o: build/assets/world/%.c build/assets/materials/static.h
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -MM $^ -MF "$(@:.o=.d)" -MT"$@"
+	$(CC) $(CFLAGS) -c -o $@ $<
 	
 build/assets/materials/%_mat.o: build/assets/materials/%_mat.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -MM $^ -MF "$(@:.o=.d)" -MT"$@"
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# build/assets/test_chambers/level_list.h: $(TEST_CHAMBER_HEADERS) tools/generate_level_list.js
+# build/assets/world/level_list.h: $(TEST_CHAMBER_HEADERS) tools/generate_level_list.js
 # 	@mkdir -p $(@D)
 # 	node tools/generate_level_list.js $@ $(TEST_CHAMBER_HEADERS)
 
@@ -173,7 +173,7 @@ $(CODESEGMENT)_no_debug.o:	$(CODEOBJECTS_NO_DEBUG)
 	$(LD) -o $(CODESEGMENT)_no_debug.o -r $(CODEOBJECTS_NO_DEBUG) $(LDFLAGS)
 
 
-$(CP_LD_SCRIPT)_no_debug.ld: $(LD_SCRIPT) build/levels.ld
+$(CP_LD_SCRIPT)_no_debug.ld: $(LD_SCRIPT) build/levels.ld build/dynamic_models.ld build/anims.ld
 	cpp -P -Wno-trigraphs $(LCDEFS) -DCODE_SEGMENT=$(CODESEGMENT)_no_debug.o -o $@ $<
 
 $(BASE_TARGET_NAME).z64: $(CODESEGMENT)_no_debug.o $(OBJECTS) $(DATA_OBJECTS) $(CP_LD_SCRIPT)_no_debug.ld
