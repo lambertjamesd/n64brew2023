@@ -6,24 +6,14 @@
 #include "graphics/graphics.h"
 #include "util/rom.h"
 #include "scene/scene.h"
-#include "menu/main_menu.h"
 #include "util/time.h"
 #include "util/memory.h"
 #include "string.h"
 #include "controls/controller.h"
-#include "controls/controller_actions.h"
-#include "scene/dynamic_scene.h"
 #include "audio/soundplayer.h"
 #include "audio/audio.h"
-#include "scene/portal_surface.h"
 #include "sk64/skelatool_defs.h"
-#include "levels/cutscene_runner.h"
-#include "savefile/savefile.h"
 #include "sk64/skelatool_animator.h"
-#include "util/dynamic_asset_loader.h"
-
-#include "levels/levels.h"
-#include "savefile/checkpoint.h"
 
 #ifdef PORTAL64_WITH_DEBUGGER
 #include "../debugger/debugger.h"
@@ -94,7 +84,6 @@ static void initProc(void* arg) {
 }
 
 struct Scene gScene;
-struct GameMenu gGameMenu;
 
 extern OSMesgQueue dmaMessageQ;
 
@@ -119,24 +108,7 @@ struct SceneCallbacks gTestChamberCallbacks = {
     .updateCallback = (UpdateCallback)&sceneUpdate,
 };
 
-struct SceneCallbacks gMainMenuCallbacks = {
-    .data = &gGameMenu,
-    .initCallback = (InitCallback)&mainMenuInit,
-    .graphicsCallback = (GraphicsCallback)&mainMenuRender,
-    .updateCallback = (UpdateCallback)&mainMenuUpdate,
-};
-
 struct SceneCallbacks* gSceneCallbacks = &gTestChamberCallbacks;
-
-void levelLoadWithCallbacks(int levelIndex) {
-    if (levelIndex == MAIN_MENU) {
-        levelLoad(0);
-        gSceneCallbacks = &gMainMenuCallbacks;
-    } else {
-        levelLoad(levelIndex);
-        gSceneCallbacks = &gTestChamberCallbacks;
-    }
-}
 
 static void gameProc(void* arg) {
     u8 schedulerMode = OS_VI_NTSC_LPF1;
@@ -197,17 +169,9 @@ static void gameProc(void* arg) {
     gdbInitDebugger(gPiHandle, &dmaMessageQ, debugThreads, 1);
 #endif
 
-    dynamicSceneInit();
-    contactSolverInit(&gContactSolver);
-    portalSurfaceCleanupQueueInit();
-    savefileLoad();
-    levelLoadWithCallbacks(MAIN_MENU);
-    gCurrentTestSubject = 0;
-    cutsceneRunnerReset();
     controllersInit();
     initAudio(fps);
     soundPlayerInit();
-    skSetSegmentLocation(CHARACTER_ANIMATION_SEGMENT, (unsigned)_animation_segmentSegmentRomStart);
     gSceneCallbacks->initCallback(gSceneCallbacks->data);
 
     while (1) {
@@ -222,24 +186,6 @@ static void gameProc(void* arg) {
                     break;
                 }
 
-                if (levelGetQueued() != NO_QUEUED_LEVEL) {
-                    if (pendingGFX == 0) {
-                        soundPlayerStopAll();
-                        dynamicSceneInit();
-                        contactSolverInit(&gContactSolver);
-                        portalSurfaceRevert(1);
-                        portalSurfaceRevert(0);
-                        portalSurfaceCleanupQueueInit();
-                        heapInit(_heapStart, memoryEnd);
-                        levelLoadWithCallbacks(levelGetQueued());
-                        cutsceneRunnerReset();
-                        dynamicAssetsReset();
-                        gSceneCallbacks->initCallback(gSceneCallbacks->data);
-                    }
-
-                    break;
-                }
-
                 if (pendingGFX < 2 && drawingEnabled) {
                     graphicsCreateTask(&gGraphicsTasks[drawBufferIndex], gSceneCallbacks->graphicsCallback, gSceneCallbacks->data);
                     drawBufferIndex = drawBufferIndex ^ 1;
@@ -248,8 +194,6 @@ static void gameProc(void* arg) {
 
                 controllersTriggerRead();
                 controllerHandlePlayback();
-                controllerActionRead();
-                skAnimatorSync();
                 
                 if (inputIgnore) {
                     --inputIgnore;
@@ -265,11 +209,6 @@ static void gameProc(void* arg) {
 
             case (OS_SC_DONE_MSG):
                 --pendingGFX;
-                portalSurfaceCheckCleanupQueue();
-
-                if (gScene.checkpointState == SceneCheckpointStatePendingRender) {
-                    gScene.checkpointState = SceneCheckpointStateReady;
-                }
                 break;
             case (OS_SC_PRE_NMI_MSG):
                 pendingGFX += 2;

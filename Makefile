@@ -9,13 +9,9 @@
 include /usr/include/n64/make/PRdefs
 
 
-SKELATOOL64:=skelatool64/skeletool64
+SKELATOOL64:=tools/skeletool64
 VTF2PNG:=vtf2png
 SFZ2N64:=sfz2n64
-
-$(SKELATOOL64):
-	skelatool64/setup_dependencies.sh
-	make -C skelatool64
 
 OPTIMIZER		:= -O0
 LCDEFS			:= -DDEBUG -g -Isrc/ -I/usr/include/n64/nustd -Werror -Wall
@@ -100,7 +96,7 @@ MODEL_LIST = assets/models/chapel.blend
 MODEL_HEADERS = $(MODEL_LIST:%.blend=build/%.h)
 MODEL_OBJECTS = $(MODEL_LIST:%.blend=build/%_geo.o)
 
-build/assets/models/%.h build/assets/models/%_geo.c build/assets/models/%_anim.c: build/assets/models/%.fbx assets/models/%.flags assets/materials/elevator.skm.yaml assets/materials/objects.skm.yaml assets/materials/static.skm.yaml $(TEXTURE_IMAGES) $(SKELATOOL64)
+build/assets/models/%.h build/assets/models/%_geo.c build/assets/models/%_anim.c: build/assets/models/%.fbx assets/models/%.flags assets/materials/static.skm.yaml $(TEXTURE_IMAGES) $(SKELATOOL64)
 	$(SKELATOOL64) --fixed-point-scale ${SCENE_SCALE} --model-scale 0.01 --name $(<:build/assets/models/%.fbx=%) $(shell cat $(<:build/assets/models/%.fbx=assets/models/%.flags)) -o $(<:%.fbx=%.h) $<
 
 ####################
@@ -121,10 +117,10 @@ build/%.fbx: %.blend
 # 	$(CC) $(CFLAGS) -MM $^ -MF "$(@:.o=.d)" -MT"$@"
 # 	$(CC) $(CFLAGS) -c -o $@ $<
 	
-# build/assets/materials/%_mat.o: build/assets/materials/%_mat.c
-# 	@mkdir -p $(@D)
-# 	$(CC) $(CFLAGS) -MM $^ -MF "$(@:.o=.d)" -MT"$@"
-# 	$(CC) $(CFLAGS) -c -o $@ $<
+build/assets/materials/%_mat.o: build/assets/materials/%_mat.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -MM $^ -MF "$(@:.o=.d)" -MT"$@"
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 # build/assets/test_chambers/level_list.h: $(TEST_CHAMBER_HEADERS) tools/generate_level_list.js
 # 	@mkdir -p $(@D)
@@ -163,11 +159,11 @@ $(BOOT_OBJ): $(BOOT)
 
 # without debugger
 
-CODEOBJECTS = $(patsubst %.c, build/%.o, $(CODEFILES)) $(MODEL_OBJECTS) build/assets/materials/static_mat.o build/assets/materials/ui_mat.o build/assets/materials/hud_mat.o
+CODEOBJECTS = $(patsubst %.c, build/%.o, $(CODEFILES)) $(MODEL_OBJECTS) build/assets/materials/static_mat.o
 
 CODEOBJECTS_NO_DEBUG = $(CODEOBJECTS)
 
-DATA_OBJECTS = build/assets/materials/images_mat.o
+DATA_OBJECTS = 
 
 ifeq ($(PORTAL64_WITH_DEBUGGER),1)
 CODEOBJECTS_NO_DEBUG += build/debugger/debugger_stub.o build/debugger/serial.o 
@@ -177,7 +173,7 @@ $(CODESEGMENT)_no_debug.o:	$(CODEOBJECTS_NO_DEBUG)
 	$(LD) -o $(CODESEGMENT)_no_debug.o -r $(CODEOBJECTS_NO_DEBUG) $(LDFLAGS)
 
 
-$(CP_LD_SCRIPT)_no_debug.ld: $(LD_SCRIPT) build/levels.ld build/dynamic_models.ld build/anims.ld
+$(CP_LD_SCRIPT)_no_debug.ld: $(LD_SCRIPT) build/levels.ld
 	cpp -P -Wno-trigraphs $(LCDEFS) -DCODE_SEGMENT=$(CODESEGMENT)_no_debug.o -o $@ $<
 
 $(BASE_TARGET_NAME).z64: $(CODESEGMENT)_no_debug.o $(OBJECTS) $(DATA_OBJECTS) $(CP_LD_SCRIPT)_no_debug.ld
@@ -195,7 +191,7 @@ endif
 $(CODESEGMENT)_debug.o:	$(CODEOBJECTS_DEBUG)
 	$(LD) -o $(CODESEGMENT)_debug.o -r $(CODEOBJECTS_DEBUG) $(LDFLAGS)
 
-$(CP_LD_SCRIPT)_debug.ld: $(LD_SCRIPT) build/levels.ld build/dynamic_models.ld build/anims.ld
+$(CP_LD_SCRIPT)_debug.ld: $(LD_SCRIPT) build/levels.ld
 	cpp -P -Wno-trigraphs $(LCDEFS) -DCODE_SEGMENT=$(CODESEGMENT)_debug.o -o $@ $<
 
 $(BASE_TARGET_NAME)_debug.z64: $(CODESEGMENT)_debug.o $(OBJECTS) $(DATA_OBJECTS) $(CP_LD_SCRIPT)_debug.ld
