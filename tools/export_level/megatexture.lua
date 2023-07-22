@@ -1,8 +1,60 @@
 local sk_definition_writer = require('sk_definition_writer')
 local sk_scene = require('sk_scene')
 local sk_math = require('sk_math')
+local sk_input = require('sk_input')
 
 megatexture_models = {}
+
+local function debug_print_recursive(any, line_prefix, already_visited)
+    if type(any) == 'table' then
+        local metatable = getmetatable(any)
+
+        if metatable and metatable.__tostring then
+            io.write(tostring(any))
+            return
+        end
+
+        if already_visited[any] then
+            io.write('<already printed>')
+            return
+        end
+
+        already_visited[any] = true
+
+        io.write('{\n')
+
+        for k, v in pairs(any) do
+            io.write('  ')
+            io.write(line_prefix)
+            debug_print_recursive(k, '  ' .. line_prefix, already_visited)
+            io.write(' = ')
+            debug_print_recursive(v, '  ' .. line_prefix, already_visited)
+            io.write(',\n')
+        end
+
+        io.write(line_prefix)
+        io.write('}')
+
+        return
+    end
+
+    if type(any) == 'string' then
+        io.write("'")
+        io.write(any)
+        io.write("'")
+        return
+    end
+
+    io.write(tostring(any))
+end
+
+local function debug_print(...)
+    for k, v in ipairs{...} do
+        debug_print_recursive(v, '', {})
+        io.write('\t')
+    end
+    io.write('\n')
+end
 
 local function edge_key(a, b)
     if a > b then
@@ -229,31 +281,333 @@ local function determine_uv_pos(model, uv_pos)
     return model.vertices[1] + edge_a * x + edge_b * y
 end
 
-local function determine_model_basis(model)
+local function determine_uv_basis(model)
     if not model.uv then
         error('Model does not have texture cooridnates')
     end
 
-    local origin = determine_uv_pos(model, sk_math.vector3(0, 0, 0))
-    local right = determine_uv_pos(model, sk_math.vector3(1, 0, 0))
-    local up = determine_uv_pos(model, sk_math.vector3(0, 1, 0))
+    -- define the origin relative to the image origin (top left)
+    local origin = determine_uv_pos(model, sk_math.vector3(0, 1, 0))
+    local right = determine_uv_pos(model, sk_math.vector3(1, 1, 0))
+    local up = determine_uv_pos(model, sk_math.vector3(0, 0, 0))
 
-    return origin, right - origin, up - origin
+    return {origin = origin, right = right - origin, up = up - origin}
+end
+
+local function build_tiles_at_lod(uv_basis, normal, edge_loops, texture, lod)
+    local rows = {}
+    local current_loops = edge_loops
+
+    local up_normal = uv_basis.up:normalized()
+
+    for y = 32, texture.height - 32, 32 do
+        local clipping_plane = sk_math.plane3_with_point(up_normal, uv_basis.origin + uv_basis.up * (y / texture.height))
+        local before
+        
+        before, current_loops = split_mesh_outline(current_loops, normal, clipping_plane)
+
+        table.insert(rows, before)
+    end
+
+    table.insert(rows, current_loops)
+
+    local mesh_tiles = {}
+    local current_row = {}
+
+    for _, row in pairs(rows) do
+        table.insert(mesh_tiles, {})
+        table.insert(current_row, row)
+    end
+
+    local right_normal = uv_basis.right:normalized()
+
+    for x = 32, texture.width - 32, 32 do
+        local clipping_plane = sk_math.plane3_with_point(right_normal, uv_basis.origin + uv_basis.right * (x / texture.width))
+
+        for row_index = 1, #current_row do 
+            local before
+            before, current_row[row_index] = split_mesh_outline(current_row[row_index], normal, clipping_plane)
+            table.insert(mesh_tiles[row_index], before)
+        end
+    end
+
+    local texture_tiles = {}
+
+    for y = 0, texture.height - 32, 32 do
+        local row = {}
+
+        for x = 0, texture.width - 32, 32 do
+            table.insert(row, texture:crop(x, y, 32, 32))
+        end
+
+        table.insert(texture_tiles, row)
+    end
+
+    for row_index = 1, #current_row do 
+        table.insert(mesh_tiles[row_index], current_row[row_index])
+    end
+
+    return {
+        mesh_tiles = mesh_tiles,
+        texture = texture,
+        tile_count_x = #texture_tiles[1],
+        tile_count_y = #texture_tiles,
+        texture_tiles = texture_tiles,
+        lod = lod,
+    }
+end
+
+local function is_power_of_2(value) 
+    if value <= 0 or math.floor(value) ~= value then
+        return false
+    end
+
+    while value ~= 1 do
+        if (value & 1) == 1 then
+            return false
+        end
+
+        value = value >> 1
+    end
+
+    return true
+end
+
+local function build_megatexture_model(world_mesh)
+    local texture = world_mesh.material.tiles[1].texture
+
+    if not texture then
+        error('texture not set')
+    end 
+
+    if not is_power_of_2(texture.width) or not is_power_of_2(texture.height) then
+        error('texture size ' .. texture.width .. 'x' .. texture.height .. ' is not a power of 2')
+    end
+
+    local current_texture = texture
+    local result = {}
+
+    local uv_basis = determine_uv_basis(world_mesh)
+    local edge_loops = build_mesh_outline(world_mesh)
+
+    local lod = 1
+
+    while current_texture.width >= 32 or current_texture.height >= 32 do
+        table.insert(result, build_tiles_at_lod(uv_basis, world_mesh.normals[1], edge_loops, current_texture, lod))
+        current_texture = current_texture:resize(current_texture.width >> 1, current_texture.height >> 1)
+        lod = lod + 1
+    end
+
+    return {
+        name = world_mesh.name,
+        layers = result,
+        uv_basis = uv_basis,
+        normal = world_mesh.normals[1],
+    }
+end
+
+local image_index = {}
+
+local function get_tiles_reference(tile_layer)
+    local key = tile_layer.texture.name .. '_' .. tile_layer.texture.width .. 'x' .. tile_layer.texture.height
+
+    if image_index[key] then
+        return image_index[key]
+    end
+
+    local image_data = {}
+
+    for _, row in pairs(tile_layer.texture_tiles) do
+        for _, tile in pairs(row) do
+            local tile_data = tile:get_data()
+
+            for _, element in pairs(tile_data) do
+                table.insert(image_data, element)
+            end
+        end
+    end
+
+    sk_definition_writer.add_definition(key, 'u64[]', '_img', image_data)
+
+    image_index[key] = sk_definition_writer.reference_to(image_data, 1)
+
+    return image_index[key]
+end
+
+local function determine_vertex_mapping(previous_loop, loop, next_loop)
+    local beginning_indices = {}
+    local middle_indices = {}
+    local end_indices = {}
+
+    for index, vertex in ipairs(loop) do
+        local priority = 0
+
+        if previous_loop then
+            for _, other in ipairs(previous_loop) do
+                if other == vertex then
+                    priority = -1
+                end
+            end
+        end
+
+        if next_loop then
+            for _, other in ipairs(next_loop) do
+                if other == vertex then
+                    priority = 1
+                end
+            end
+        end
+
+        if priority == -1 then
+            table.insert(beginning_indices, index)
+        elseif priority == 0 then
+            table.insert(middle_indices, index)
+        else
+            table.insert(end_indices, index)
+        end
+    end
+
+    local new_to_old_index = {}
+
+    for _, idx in ipairs(beginning_indices) do
+        table.insert(new_to_old_index, idx)
+    end
+
+    for _, idx in ipairs(middle_indices) do
+        table.insert(new_to_old_index, idx)
+    end
+
+    for _, idx in ipairs(end_indices) do
+        table.insert(new_to_old_index, idx)
+    end
+
+    local old_to_new_index = {}
+
+    for new, old in ipairs(new_to_old_index) do
+        old_to_new_index[old] = new
+    end 
+
+    return {
+        new_to_old_index = new_to_old_index,
+        old_to_new_index = old_to_new_index,
+        beginning_overlap = #beginning_indices,
+        ending_overlap = #end_indices,
+    }
+end
+
+local function convert_vertex(vertex, megatexture_model)
+    local scaled = vertex * sk_input.settings.fixed_point_scale
+    local scaled_normal = megatexture_model.normal * 127
+
+    return {{
+        {math.floor(scaled.x + 0.5), math.floor(scaled.y + 0.5), math.floor(scaled.z + 0.5)},
+        0,
+        {0, 0},
+        {math.floor(scaled_normal.x + 0.5), math.floor(scaled_normal.y + 0.5), math.floor(scaled_normal.z + 0.5), 255},
+    }}
+end
+
+local function write_mesh_tiles(megatexture_model, layer)
+    local vertices = {}
+    local indices = {}
+    local tiles = {}
+
+    min_tile_x = layer.tile_count_x
+    min_tile_y = layer.tile_count_y
+
+    max_tile_x = 0
+    max_tile_y = 0
+
+    for y, row in ipairs(layer.mesh_tiles) do
+        local previous_loop = nil
+
+        for x, cell in ipairs(row) do
+            -- todo combine holes
+            local current_loop = cell[1]
+            local next_loop = row[x + 1] and row[x + 1][1]
+
+            if #current_loop > 0 then
+                min_tile_x = math.min(min_tile_x, x)
+                min_tile_y = math.min(min_tile_y, y)
+
+                max_tile_x = math.max(max_tile_x, x)
+                max_tile_y = math.max(max_tile_y, y)
+            end
+
+            local vertex_mapping = determine_vertex_mapping(previous_loop, current_loop, next_loop)
+
+            previous_loop = current_loop
+
+            local beginning_vertex = #vertices + 1 - vertex_mapping.beginning_overlap
+            local beginning_index_length = #indices
+
+            for new, old in ipairs(vertex_mapping.new_to_old_index) do
+                if new > vertex_mapping.beginning_overlap then
+                    table.insert(vertices, convert_vertex(current_loop[old], megatexture_model))
+                end
+            end
+
+            -- TODO proper polygon fill instead of triangle fan
+            for i = 3, #current_loop do
+                table.insert(indices, vertex_mapping.old_to_new_index[1] - 1)
+                table.insert(indices, vertex_mapping.old_to_new_index[i - 1] - 1)
+                table.insert(indices, vertex_mapping.old_to_new_index[i] - 1)
+            end
+
+            table.insert(tiles, {
+                beginning_vertex - 1,
+                beginning_index_length,
+                #indices - beginning_index_length,
+            })
+        end
+    end
+
+    sk_definition_writer.add_definition(megatexture_model.name .. '_vertices_' .. layer.lod, 'Vtx[]', '_geo', vertices)
+    sk_definition_writer.add_definition(megatexture_model.name .. '_indices_' .. layer.lod, 'u8[]', '_geo', indices)
+    sk_definition_writer.add_definition(megatexture_model.name .. '_tiles_' .. layer.lod, 'struct MTMeshTile[]', '_geo', tiles)
+
+    return {
+        vertices = sk_definition_writer.reference_to(vertices, 1),
+        indices = sk_definition_writer.reference_to(indices, 1),
+        tiles = sk_definition_writer.reference_to(tiles, 1),
+
+        minTileX = min_tile_x - 1,
+        minTileY = min_tile_y - 1,
+        maxTileX = max_tile_x,
+        maxTileY = max_tile_y,
+    }
+end 
+
+local function write_tile_index(mesh_name, megatexture_model)
+    local layers = {}
+
+    for _, layer in pairs(megatexture_model.layers) do
+        table.insert(layers, {
+            tileSource = get_tiles_reference(layer),
+            xTiles = layer.tile_count_x,
+            yTiles = layer.tile_count_y,
+            mesh = write_mesh_tiles(megatexture_model, layer),
+        })
+    end
+
+    sk_definition_writer.add_definition(mesh_name .. '_layers', 'struct MTTileLayer[]', '_geo', layers)
+
+    sk_definition_writer.add_definition(mesh_name .. '_index', 'struct MTTileIndex', '_geo', {
+        layers = sk_definition_writer.reference_to(layers, 1),
+        layerCount = #layers,
+    })
 end
 
 for _, node in pairs(sk_scene.nodes_for_type('@megatexture')) do
-    table.insert(megatexture_models, {1, 2, 3})
-
     if #node.node.meshes > 0 then
         local world_mesh = node.node.meshes[1]:transform(node.node.full_transformation)
-        local edge_loops = build_mesh_outline(world_mesh)
-        local behind, infront = split_mesh_outline(edge_loops, world_mesh.normals[1], sk_math.plane3(sk_math.vector3(1, 0, 0), 0))
-        print(world_mesh.material.tiles[1].texture.height)
-        print(determine_model_basis(world_mesh))
+        local megatexture_model = build_megatexture_model(world_mesh)
+        write_tile_index(world_mesh.name, megatexture_model)
     end
 end
 
-
+sk_definition_writer.add_header('<ultra64.h>')
+sk_definition_writer.add_header('"megatextures/tile_index.h"')
 sk_definition_writer.add_definition("megatextures", "struct MegaTextureModel", "_geo", megatexture_models)
 
 return {
