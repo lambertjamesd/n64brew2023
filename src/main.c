@@ -14,6 +14,8 @@
 #include "audio/audio.h"
 #include "sk64/skelatool_defs.h"
 #include "sk64/skelatool_animator.h"
+#include "levels/level.h"
+#include "levels/level_list.h"
 
 #ifdef PORTAL64_WITH_DEBUGGER
 #include "../debugger/debugger.h"
@@ -172,6 +174,7 @@ static void gameProc(void* arg) {
     controllersInit();
     initAudio(fps);
     soundPlayerInit();
+    levelLoadDefinition(&gLevelList[0]);
     gSceneCallbacks->initCallback(gSceneCallbacks->data);
 
     while (1) {

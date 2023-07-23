@@ -31,3 +31,29 @@ materials:
       filename: ./megatextures/test.jpg
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b
+
+  tile_test:
+    gDPSetCombineMode:
+      color: ["0", "0", "0", PRIMITIVE]
+    gDPSetCycleType: G_CYC_1CYCLE
+    gDPSetRenderMode: G_RM_ZB_OPA_SURF
+    gDPSetPrimColor:
+      r: 0
+      g: 255
+      b: 255
+    gSPGeometryMode:
+      clear: [G_LIGHTING, G_SHADE]
+
+  tile_image:
+    gDPSetTile:
+      filename: ./megatextures/tile.png
+      s:
+        wrap: false
+      t:
+        wrap: false
+    gDPSetCombineMode:
+      color: ["0", "0", "0", TEXEL0]
+    gDPSetCycleType: G_CYC_1CYCLE
+    gDPSetRenderMode: G_RM_ZB_OPA_SURF
+    gSPGeometryMode:
+      clear: [G_LIGHTING, G_SHADE]

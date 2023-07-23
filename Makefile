@@ -99,11 +99,18 @@ MODEL_OBJECTS = $(MODEL_LIST:%.blend=build/%_geo.o)
 build/assets/models/%.h build/assets/models/%_geo.c build/assets/models/%_anim.c: build/assets/models/%.fbx assets/models/%.flags assets/materials/static.skm.yaml $(TEXTURE_IMAGES) $(SKELATOOL64)
 	$(SKELATOOL64) --fixed-point-scale ${SCENE_SCALE} --model-scale 0.01 --name $(<:build/assets/models/%.fbx=%) $(shell cat $(<:build/assets/models/%.fbx=assets/models/%.flags)) -o $(<:%.fbx=%.h) $<
 
+build/src/scene/scene.o: build/assets/models/chapel.h
+
 ####################
 ## Megatextures
 ####################
 
 LUA_FILES = $(shell find tools/ -type f -name '*.lua')
+
+WORLD_FILES = assets/world/test.blend
+
+WORLD_HEADERS = $(WORLD_FILES:%.blend=build/%.h)
+WORLD_OBJECTS = $(WORLD_FILES:%.blend=build/%_geo.o) $(WORLD_FILES:%.blend=build/%_img.o)
 
 build/%.fbx: %.blend
 	@mkdir -p $(@D)
@@ -122,13 +129,15 @@ build/assets/materials/%_mat.o: build/assets/materials/%_mat.c
 	$(CC) $(CFLAGS) -MM $^ -MF "$(@:.o=.d)" -MT"$@"
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# build/assets/world/level_list.h: $(TEST_CHAMBER_HEADERS) tools/generate_level_list.js
-# 	@mkdir -p $(@D)
-# 	node tools/generate_level_list.js $@ $(TEST_CHAMBER_HEADERS)
-
-build/levels.ld: $(TEST_CHAMBER_OBJECTS) tools/generate_level_ld.js
+build/assets/world/level_list.h: $(WORLD_HEADERS) tools/generate_level_list.js
 	@mkdir -p $(@D)
-	node tools/generate_level_ld.js $@ 0x02000000 $(TEST_CHAMBER_OBJECTS)
+	node tools/generate_level_list.js $@ $(WORLD_HEADERS)
+
+build/levels.ld: $(WORLD_OBJECTS) tools/generate_level_ld.js
+	@mkdir -p $(@D)
+	node tools/generate_level_ld.js $@ 0x02000000 $(WORLD_OBJECTS)
+
+build/src/levels/level_list.o: build/assets/world/level_list.h
 
 ####################
 ## Sounds
@@ -173,7 +182,7 @@ $(CODESEGMENT)_no_debug.o:	$(CODEOBJECTS_NO_DEBUG)
 	$(LD) -o $(CODESEGMENT)_no_debug.o -r $(CODEOBJECTS_NO_DEBUG) $(LDFLAGS)
 
 
-$(CP_LD_SCRIPT)_no_debug.ld: $(LD_SCRIPT) build/levels.ld build/dynamic_models.ld build/anims.ld
+$(CP_LD_SCRIPT)_no_debug.ld: $(LD_SCRIPT) build/levels.ld
 	cpp -P -Wno-trigraphs $(LCDEFS) -DCODE_SEGMENT=$(CODESEGMENT)_no_debug.o -o $@ $<
 
 $(BASE_TARGET_NAME).z64: $(CODESEGMENT)_no_debug.o $(OBJECTS) $(DATA_OBJECTS) $(CP_LD_SCRIPT)_no_debug.ld

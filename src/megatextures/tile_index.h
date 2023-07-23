@@ -19,6 +19,7 @@ struct MTMeshLayer {
     u8 minTileY;
     u8 maxTileX;
     u8 maxTileY;
+    u8 tileXBits;
 };
 
 struct MTTileLayer {

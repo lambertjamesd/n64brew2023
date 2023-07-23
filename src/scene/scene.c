@@ -2,6 +2,8 @@
 
 #include "../build/assets/models/chapel.h"
 #include "../build/assets/materials/static.h"
+#include "../levels/level.h"
+#include "../megatextures/megatexture_renderer.h"
 
 #include "../controls/controller.h"
 
@@ -10,10 +12,14 @@
 void sceneInit(struct Scene* scene) {
     cameraInit(&scene->camera, 70.0f, 0.5f * SCENE_SCALE, 30.0f * SCENE_SCALE);
 
-    scene->camera.transform.position = gUp;
+    scene->camera.transform.position.x = 0.0f;
+    scene->camera.transform.position.y = 1.0f;
+    scene->camera.transform.position.z = 2.0f;
 }
 
 extern Vp fullscreenViewport;
+
+int tmp = 0;
 
 void sceneRender(struct Scene* scene, struct RenderState* renderState, struct GraphicsTask* task) {
     struct CameraMatrixInfo cameraInfo;
@@ -22,6 +28,12 @@ void sceneRender(struct Scene* scene, struct RenderState* renderState, struct Gr
 
     gSPDisplayList(renderState->dl++, static_vertex_color);
     gSPDisplayList(renderState->dl++, chapel_model_gfx);
+
+    gSPDisplayList(renderState->dl++, static_tile_image);
+    gDPSetTile(renderState->dl++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 8, 0, 0, 0, G_TX_CLAMP | G_TX_MIRROR, 5, 0, G_TX_CLAMP | G_TX_MIRROR, 5, 0);
+    megatextureRender(&gLoadedLevel->megatextureIndexes[0], renderState);
+
+    ++tmp;
 }
 
 void playerGetMoveBasis(struct Transform* transform, struct Vector3* forward, struct Vector3* right) {
@@ -47,11 +59,11 @@ void sceneUpdate(struct Scene* scene) {
     float sideToSide = 0.0f;
 
     if (controllerGetButton(0, U_CBUTTONS)) {
-        frontToBack += 1.0f;
+        frontToBack -= 1.0f;
     }
 
     if (controllerGetButton(0, D_CBUTTONS)) {
-        frontToBack -= 1.0f;
+        frontToBack += 1.0f;
     }
 
     if (controllerGetButton(0, R_CBUTTONS)) {

@@ -3,8 +3,6 @@ local sk_scene = require('sk_scene')
 local sk_math = require('sk_math')
 local sk_input = require('sk_input')
 
-megatexture_models = {}
-
 local function debug_print_recursive(any, line_prefix, already_visited)
     if type(any) == 'table' then
         local metatable = getmetatable(any)
@@ -403,6 +401,7 @@ local function build_megatexture_model(world_mesh)
         layers = result,
         uv_basis = uv_basis,
         normal = world_mesh.normals[1],
+        texture = texture,
     }
 end
 
@@ -499,12 +498,44 @@ local function convert_vertex(vertex, megatexture_model)
     local scaled = vertex * sk_input.settings.fixed_point_scale
     local scaled_normal = megatexture_model.normal * 127
 
+    local right = megatexture_model.uv_basis.right
+    local up = megatexture_model.uv_basis.up
+
+    local uv_relative = vertex - megatexture_model.uv_basis.origin
+
+    local u = uv_relative:dot(right) / right:magnitudeSqrd()
+    local v = uv_relative:dot(up) / up:magnitudeSqrd()
+
+    u = math.floor(u * megatexture_model.texture.width * (1 << 5) + 0.5)
+    v = math.floor(v * megatexture_model.texture.height * (1 << 5) + 0.5)
+
+    if u >= 0x8000 then
+        u = 0x7FFF
+    end
+
+    if v >= 0x8000 then
+        v = 0x7FFF
+    end
+
     return {{
         {math.floor(scaled.x + 0.5), math.floor(scaled.y + 0.5), math.floor(scaled.z + 0.5)},
         0,
-        {0, 0},
+        {u, v},
         {math.floor(scaled_normal.x + 0.5), math.floor(scaled_normal.y + 0.5), math.floor(scaled_normal.z + 0.5), 255},
     }}
+end
+
+local function calc_bits_needed(width)
+    local bits = 0
+
+    width = width - 1
+
+    while (width > 0) do 
+        width = width >> 1
+        bits = bits + 1
+    end
+
+    return bits
 end
 
 local function write_mesh_tiles(megatexture_model, layer)
@@ -555,9 +586,10 @@ local function write_mesh_tiles(megatexture_model, layer)
             end
 
             table.insert(tiles, {
-                beginning_vertex - 1,
-                beginning_index_length,
-                #indices - beginning_index_length,
+                startVertex = beginning_vertex - 1,
+                startIndex = beginning_index_length,
+                indexCount = #indices - beginning_index_length,
+                vertexCount = #current_loop,
             })
         end
     end
@@ -565,6 +597,8 @@ local function write_mesh_tiles(megatexture_model, layer)
     sk_definition_writer.add_definition(megatexture_model.name .. '_vertices_' .. layer.lod, 'Vtx[]', '_geo', vertices)
     sk_definition_writer.add_definition(megatexture_model.name .. '_indices_' .. layer.lod, 'u8[]', '_geo', indices)
     sk_definition_writer.add_definition(megatexture_model.name .. '_tiles_' .. layer.lod, 'struct MTMeshTile[]', '_geo', tiles)
+
+    local tileXBits = calc_bits_needed(max_tile_x + 1 - min_tile_x)
 
     return {
         vertices = sk_definition_writer.reference_to(vertices, 1),
@@ -575,6 +609,7 @@ local function write_mesh_tiles(megatexture_model, layer)
         minTileY = min_tile_y - 1,
         maxTileX = max_tile_x,
         maxTileY = max_tile_y,
+        tileXBits = tileXBits,
     }
 end 
 
@@ -592,24 +627,28 @@ local function write_tile_index(mesh_name, megatexture_model)
 
     sk_definition_writer.add_definition(mesh_name .. '_layers', 'struct MTTileLayer[]', '_geo', layers)
 
-    sk_definition_writer.add_definition(mesh_name .. '_index', 'struct MTTileIndex', '_geo', {
+    return {
         layers = sk_definition_writer.reference_to(layers, 1),
         layerCount = #layers,
-    })
+    }
 end
+
+local megatexture_indexes = {}
 
 for _, node in pairs(sk_scene.nodes_for_type('@megatexture')) do
     if #node.node.meshes > 0 then
         local world_mesh = node.node.meshes[1]:transform(node.node.full_transformation)
         local megatexture_model = build_megatexture_model(world_mesh)
-        write_tile_index(world_mesh.name, megatexture_model)
+        local megatexture_index = write_tile_index(world_mesh.name, megatexture_model)
+        table.insert(megatexture_indexes, megatexture_index) 
     end
 end
 
+sk_definition_writer.add_definition('indexes', 'struct MTTileIndex[]', '_geo', megatexture_indexes)
+
 sk_definition_writer.add_header('<ultra64.h>')
 sk_definition_writer.add_header('"megatextures/tile_index.h"')
-sk_definition_writer.add_definition("megatextures", "struct MegaTextureModel", "_geo", megatexture_models)
 
 return {
-    megatexture_models = megatexture_models
+    megatexture_indexes = megatexture_indexes
 }
