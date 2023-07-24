@@ -2,6 +2,9 @@
 
 #define MAX_VERTEX_CACHE_SIZE   32
 
+#include "./megatexture_culling_loop.h"
+#include "../math/mathf.h"
+
 void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileLayer* layer, int row, int minX, int maxX, struct RenderState* renderState) {
     int currentVertexCount = 0;
 
@@ -50,6 +53,27 @@ void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileLayer* lay
 void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, struct FrustrumCullingInformation* cullingPlanes, struct RenderState* renderState) {
     if (isOutsideFrustrum(cullingPlanes, &index->boundingBox)) {
         return;
+    }
+
+    struct MTCullingLoop cullingLoop;
+
+    mtCullingLoopInit(&cullingLoop);
+
+    for (int i = 0; i < cullingPlanes->usedClippingPlaneCount; ++i) {
+        struct Plane2 clippingPlane;
+        mtProjectClippingPlane(&cullingPlanes->clippingPlanes[i], &index->uvBasis, &clippingPlane);
+
+        if (fabsf(clippingPlane.normal.x) < 0.000001f && fabsf(clippingPlane.normal.y) < 0.000001f) {
+            if (clippingPlane.d < 0.0f) {
+                // the plane is entirely outside the view
+                return;
+            }
+
+            // the plane is entirely inside the view
+            continue;
+        }
+
+        mtCullingLoopSplit(&cullingLoop, &clippingPlane, NULL);
     }
 
     struct MTTileLayer* topLayer = &index->layers[0];

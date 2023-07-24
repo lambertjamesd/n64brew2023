@@ -640,9 +640,11 @@ local function write_tile_index(world_mesh, megatexture_model)
             math.floor(min_bb.x + 0.5), math.floor(min_bb.y + 0.5), math.floor(min_bb.z + 0.5),
             math.floor(max_bb.x + 0.5), math.floor(max_bb.y + 0.5), math.floor(max_bb.z + 0.5),
         },
-        uvOrigin = megatexture_model.uv_basis.origin * fixed_point_scale,
-        uvRight = megatexture_model.uv_basis.right * fixed_point_scale,
-        uvUp = megatexture_model.uv_basis.up * fixed_point_scale,
+        uvBasis = {
+            uvOrigin = megatexture_model.uv_basis.origin * fixed_point_scale,
+            uvRight = megatexture_model.uv_basis.right * fixed_point_scale,
+            uvUp = megatexture_model.uv_basis.up * fixed_point_scale,
+        },
     }
 end
 

@@ -33,13 +33,17 @@ struct MTTileLayer {
     struct MTMeshLayer mesh;
 };
 
+struct MTUVBasis {
+    struct Vector3 uvOrigin;
+    struct Vector3 uvRight;
+    struct Vector3 uvUp;
+};
+
 struct MTTileIndex {
     struct MTTileLayer* layers;
     u8 layerCount;
     struct BoundingBoxs16 boundingBox;
-    struct Vector3 uvOrigin;
-    struct Vector3 uvRight;
-    struct Vector3 uvUp;
+    struct MTUVBasis uvBasis;
 };
 
 #endif
