@@ -174,7 +174,7 @@ CODEOBJECTS_NO_DEBUG = $(CODEOBJECTS)
 
 DATA_OBJECTS = 
 
-ifeq ($(PORTAL64_WITH_DEBUGGER),1)
+ifeq ($(WITH_DEBUGGER),1)
 CODEOBJECTS_NO_DEBUG += build/debugger/debugger_stub.o build/debugger/serial.o 
 endif
 
@@ -193,7 +193,7 @@ $(BASE_TARGET_NAME).z64: $(CODESEGMENT)_no_debug.o $(OBJECTS) $(DATA_OBJECTS) $(
 # with debugger
 CODEOBJECTS_DEBUG = $(CODEOBJECTS) 
 
-ifeq ($(PORTAL64_WITH_DEBUGGER),1)
+ifeq ($(WITH_DEBUGGER),1)
 CODEOBJECTS_DEBUG += build/debugger/debugger.o build/debugger/serial.o 
 endif
 

@@ -613,23 +613,36 @@ local function write_mesh_tiles(megatexture_model, layer)
     }
 end 
 
-local function write_tile_index(mesh_name, megatexture_model)
+local function write_tile_index(world_mesh, megatexture_model)
     local layers = {}
 
-    for _, layer in pairs(megatexture_model.layers) do
+    for lod, layer in pairs(megatexture_model.layers) do
         table.insert(layers, {
             tileSource = get_tiles_reference(layer),
             xTiles = layer.tile_count_x,
             yTiles = layer.tile_count_y,
+            lod = lod - 1,
             mesh = write_mesh_tiles(megatexture_model, layer),
         })
     end
 
-    sk_definition_writer.add_definition(mesh_name .. '_layers', 'struct MTTileLayer[]', '_geo', layers)
+    sk_definition_writer.add_definition(world_mesh.name .. '_layers', 'struct MTTileLayer[]', '_geo', layers)
+
+    local fixed_point_scale = sk_input.settings.fixed_point_scale
+
+    local min_bb = world_mesh.bb.min * fixed_point_scale
+    local max_bb = world_mesh.bb.max * fixed_point_scale
 
     return {
         layers = sk_definition_writer.reference_to(layers, 1),
         layerCount = #layers,
+        boundingBox = {
+            math.floor(min_bb.x + 0.5), math.floor(min_bb.y + 0.5), math.floor(min_bb.z + 0.5),
+            math.floor(max_bb.x + 0.5), math.floor(max_bb.y + 0.5), math.floor(max_bb.z + 0.5),
+        },
+        uvOrigin = megatexture_model.uv_basis.origin * fixed_point_scale,
+        uvRight = megatexture_model.uv_basis.right * fixed_point_scale,
+        uvUp = megatexture_model.uv_basis.up * fixed_point_scale,
     }
 end
 
@@ -639,7 +652,7 @@ for _, node in pairs(sk_scene.nodes_for_type('@megatexture')) do
     if #node.node.meshes > 0 then
         local world_mesh = node.node.meshes[1]:transform(node.node.full_transformation)
         local megatexture_model = build_megatexture_model(world_mesh)
-        local megatexture_index = write_tile_index(world_mesh.name, megatexture_model)
+        local megatexture_index = write_tile_index(world_mesh, megatexture_model)
         table.insert(megatexture_indexes, megatexture_index) 
     end
 end

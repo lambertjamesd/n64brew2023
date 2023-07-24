@@ -2,7 +2,7 @@
 
 #define MAX_VERTEX_CACHE_SIZE   32
 
-void megatextureRenderRow(struct MTTileLayer* layer, int row, int minX, int maxX, struct RenderState* renderState) {
+void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileLayer* layer, int row, int minX, int maxX, struct RenderState* renderState) {
     int currentVertexCount = 0;
 
     Gfx* vertexCopyCommand = renderState->dl++;
@@ -22,7 +22,8 @@ void megatextureRenderRow(struct MTTileLayer* layer, int row, int minX, int maxX
 
         currentVertexCount = startIndex + tile->vertexCount;
 
-        // TODO apply the tile
+        Gfx* tileRequest = mtTileCacheRequestTile(tileCache, &layer->tileSource[MT_TILE_WORDS * (x + row * layer->xTiles)], x, row, layer->lod);
+        gSPDisplayList(renderState->dl++, tileRequest)
 
         u8* indices = &layer->mesh.indices[tile->startIndex];
         u8* indexEnd = indices + tile->indexCount;
@@ -46,13 +47,13 @@ void megatextureRenderRow(struct MTTileLayer* layer, int row, int minX, int maxX
     gSPVertex(vertexCopyCommand, &layer->mesh.vertices[startVertex], currentVertexCount, 0);
 }
 
-void megatextureRender(struct MTTileIndex* index, struct RenderState* renderState) {
+void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, struct FrustrumCullingInformation* cullingPlanes, struct RenderState* renderState) {
+    if (isOutsideFrustrum(cullingPlanes, &index->boundingBox)) {
+        return;
+    }
+
     struct MTTileLayer* topLayer = &index->layers[0];
     for (int row = topLayer->mesh.minTileY; row < topLayer->mesh.maxTileY; ++row) {
-        // if (row != 1) {
-        //     continue;
-        // }
-
-        megatextureRenderRow(topLayer, row, topLayer->mesh.minTileX, topLayer->mesh.maxTileX, renderState);
+        megatextureRenderRow(tileCache, topLayer, row, topLayer->mesh.minTileX, topLayer->mesh.maxTileX, renderState);
     }
 }

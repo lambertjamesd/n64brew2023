@@ -10,5 +10,9 @@ void levelLoadDefinition(struct LevelMetadata* metadata) {
     void* levelSegment = malloc(segmentSize);
     romCopy(metadata->segmentRomStart, levelSegment, segmentSize);
 
-    gLoadedLevel = levelDefinitionFixPointers(metadata->levelDefinition, (u32)levelSegment - (u32)metadata->segmentStart);
+    gLoadedLevel = levelDefinitionFixPointers(
+        metadata->levelDefinition, 
+        (u32)levelSegment - (u32)metadata->segmentStart,
+        (u32)metadata->segmentImgRomStart - (u32)metadata->segmentStart
+    );
 }

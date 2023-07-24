@@ -3,7 +3,9 @@
 
 #include "tile_index.h"
 #include "../graphics/renderstate.h"
+#include "./megatexture_tilecache.h"
+#include "../scene/camera.h"
 
-void megatextureRender(struct MTTileIndex* index, struct RenderState* renderState);
+void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, struct FrustrumCullingInformation* cullingPlanes, struct RenderState* renderState);
 
 #endif

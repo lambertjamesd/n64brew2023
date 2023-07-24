@@ -9,11 +9,11 @@ extern OSMesgQueue	*schedulerCommandQueue;
 
 void* gLevelSegment;
 
-#if PORTAL64_WITH_GFX_VALIDATOR
+#if WITH_GFX_VALIDATOR
 #include "../../gfxvalidator/validator.h"
 #endif
 
-#if PORTAL64_WITH_DEBUGGER
+#if WITH_DEBUGGER
 #include "../../debugger/debugger.h"
 #include "../../debugger/serial.h"
 
@@ -117,8 +117,8 @@ void graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callba
     scTask->next = 0;
     scTask->state = 0;
 
-#if PORTAL64_WITH_GFX_VALIDATOR
-#if PORTAL64_WITH_DEBUGGER
+#if WITH_GFX_VALIDATOR
+#if WITH_DEBUGGER
     struct GFXValidationResult validationResult;
     zeroMemory(&validationResult, sizeof(struct GFXValidationResult));
 
@@ -127,8 +127,8 @@ void graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callba
         gdbBreak();
     }
 
-#endif // PORTAL64_WITH_DEBUGGER
-#endif // PORTAL64_WITH_GFX_VALIDATOR
+#endif // WITH_DEBUGGER
+#endif // WITH_GFX_VALIDATOR
 
     osSendMesg(schedulerCommandQueue, (OSMesg)scTask, OS_MESG_BLOCK);
 }

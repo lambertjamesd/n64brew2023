@@ -11,6 +11,6 @@ struct LevelDefinition {
 
 #define ADJUST_POINTER_POS(ptr, offset) (void*)((ptr) ? (char*)(ptr) + (offset) : 0)
 
-struct LevelDefinition* levelDefinitionFixPointers(struct LevelDefinition* source, u32 pointerOffset);
+struct LevelDefinition* levelDefinitionFixPointers(struct LevelDefinition* source, u32 pointerOffset, u32 imagePointerOffset);
 
 #endif

@@ -17,7 +17,7 @@
 #include "levels/level.h"
 #include "levels/level_list.h"
 
-#ifdef PORTAL64_WITH_DEBUGGER
+#ifdef WITH_DEBUGGER
 #include "../debugger/debugger.h"
 #endif
 
@@ -165,7 +165,7 @@ static void gameProc(void* arg) {
     heapInit(_heapStart, memoryEnd);
     romInit();
 
-#ifdef PORTAL64_WITH_DEBUGGER
+#ifdef WITH_DEBUGGER
     OSThread* debugThreads[2];
     debugThreads[0] = &gameThread;
     gdbInitDebugger(gPiHandle, &dmaMessageQ, debugThreads, 1);

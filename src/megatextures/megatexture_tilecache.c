@@ -4,8 +4,23 @@
 
 #define LARGE_PRIME_NUMBER  2147483647
 
-void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount, OSPiHandle* piHandle) {
-    tileCache->piHandle = piHandle;
+void mtTileCacheBuildTileLoader(struct MTTileCache* tileCache, int entryIndex) {
+    Gfx* dl = &tileCache->tileLoaders[entryIndex * MT_GFX_SIZE];
+    // call this before using the display list
+    gDPPipeSync(dl++);
+    gDPTileSync(dl++);
+    gDPSetTextureImage(dl++, G_IM_FMT_RGBA, G_IM_SIZ_16b_LOAD_BLOCK, 1, &tileCache->tileData[entryIndex * MT_TILE_WORDS]);
+    gDPSetTile(dl++, G_IM_FMT_RGBA, G_IM_SIZ_16b_LOAD_BLOCK, 0, 0, G_TX_LOADTILE, 0, G_TX_CLAMP | G_TX_NOMIRROR, 5, 0, G_TX_CLAMP | G_TX_NOMIRROR, 5, 0);
+    gDPLoadSync(dl++);
+    gDPLoadBlock(dl++, G_TX_LOADTILE, 0, 0, 1023, 256);
+    gDPPipeSync(dl++);
+    gDPSetTile(dl++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 8, 0, 0, 0, G_TX_CLAMP | G_TX_NOMIRROR, 5, 0, G_TX_CLAMP | G_TX_NOMIRROR, 5, 0);
+    gDPSetTileSize(dl++, 0, 0, 0, 124, 124);
+    gSPEndDisplayList(dl++);
+}
+
+void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount) {
+    tileCache->piHandle = osCartRomInit();
     tileCache->entries = malloc(sizeof(struct MTTileCacheEntry) * entryCount);
     tileCache->tileData = malloc(MT_TILE_SIZE * entryCount);
     tileCache->tileLoaders = malloc(sizeof(Gfx) * MT_GFX_SIZE * entryCount);
@@ -37,10 +52,14 @@ void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount, OSPiHandle* 
         tileCache->entries[i].nextHashTile = MT_NO_TILE_INDEX;
         tileCache->entries[i].hashTableIndex = MT_NO_TILE_INDEX;
         tileCache->entries[i].romAddress = NULL;
+
+        mtTileCacheBuildTileLoader(tileCache, i);
     }
 
-    osCreateMesgQueue(&tileCache->tileQueue, &tileCache->messages[0], MT_TILE_QUEUE_SIZE);
+    osWritebackDCache(tileCache->tileLoaders, sizeof(Gfx) * MT_GFX_SIZE * entryCount);
+    osCreateMesgQueue(&tileCache->tileQueue, &tileCache->inboundMessages[0], MT_TILE_QUEUE_SIZE);
     tileCache->pendingMessages = 0;
+    tileCache->nextOutboundMessage = 0;
 }
 
 int mtTileCacheRemoveOldestUsedTile(struct MTTileCache* tileCache) {
@@ -69,7 +88,7 @@ int mtTileCacheRemoveOldestUsedTile(struct MTTileCache* tileCache) {
         entry->nextHashTile = MT_NO_TILE_INDEX;
     }
 
-    tileCache->oldestUsedTile = entry->olderTile;
+    tileCache->oldestUsedTile = entry->newerTile;
     struct MTTileCacheEntry* nextTile = &tileCache->entries[entry->newerTile];
     nextTile->olderTile = MT_NO_TILE_INDEX;
     entry->newerTile = MT_NO_TILE_INDEX;
@@ -88,6 +107,7 @@ void mtTileCacheAdd(struct MTTileCache* tileCache, int entryIndex, int hashIndex
     tileCache->newestUsedTile = entryIndex;
 
     entry->nextHashTile = tileCache->hashTable[hashIndex];
+    entry->hashTableIndex = hashIndex;
     tileCache->hashTable[hashIndex] = entryIndex;
 }
 
@@ -124,27 +144,46 @@ void mtTileCacheRequestFromRom(struct MTTileCache* tileCache, int entryIndex, vo
 
     entry->romAddress = romAddress;
 
-    OSIoMesg dmaIoMesgBuf;
-    OSMesg dummyMesg;
+    OSIoMesg* dmaIoMesgBuf = &tileCache->outboundMessages[tileCache->nextOutboundMessage];
+    ++tileCache->nextOutboundMessage;
 
-    dmaIoMesgBuf.hdr.pri      = OS_MESG_PRI_NORMAL;
-    dmaIoMesgBuf.hdr.retQueue = &tileCache->tileQueue;
-    dmaIoMesgBuf.dramAddr     = (void*)&tileCache->tileData[entryIndex * MT_TILE_SIZE];
-    dmaIoMesgBuf.devAddr      = (u32)romAddress;
-    dmaIoMesgBuf.size         = MT_TILE_SIZE;
+    if (tileCache->nextOutboundMessage == MT_TILE_QUEUE_SIZE) {
+        tileCache->nextOutboundMessage = 0;
+    }
+
+    dmaIoMesgBuf->hdr.pri      = OS_MESG_PRI_NORMAL;
+    dmaIoMesgBuf->hdr.retQueue = &tileCache->tileQueue;
+    dmaIoMesgBuf->dramAddr     = (void*)&tileCache->tileData[entryIndex * MT_TILE_WORDS];
+    dmaIoMesgBuf->devAddr      = (u32)romAddress;
+    dmaIoMesgBuf->size         = MT_TILE_SIZE;
 
     if (tileCache->pendingMessages == MT_TILE_QUEUE_SIZE) {
+        OSMesg dummyMesg;
         (void)osRecvMesg(&tileCache->tileQueue, &dummyMesg, OS_MESG_BLOCK);
         --tileCache->pendingMessages;
     }
 
-    osEPiStartDma(tileCache->piHandle, &dmaIoMesgBuf, OS_READ);
+    osEPiStartDma(tileCache->piHandle, dmaIoMesgBuf, OS_READ);
     ++tileCache->pendingMessages;
-
-    // TODO update gfx
 }
 
-Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, void* romAddress) {
+void mtTileCacheFixDisplayList(struct MTTileCache* tileCache, int entryIndex, int x, int y, int lod) {
+    Gfx* dl = &tileCache->tileLoaders[entryIndex * MT_GFX_SIZE];
+
+    dl += (MT_GFX_SIZE - 3);
+
+    // multiply to convert tileX to pixel x, bit shift for fixed point texture coordinates
+    // x = (x * 32) << 2
+    x <<= 7;
+    y <<= 7;
+
+    gDPSetTile(dl++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 8, 0, 0, 0, G_TX_CLAMP | G_TX_NOMIRROR, 5, lod, G_TX_CLAMP | G_TX_NOMIRROR, 5, lod);
+    gDPSetTileSize(dl++, 0, x, y, x + 124, y + 124);
+
+    osWritebackDCache(dl - 2, sizeof(Gfx) * 2);
+}
+
+Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, void* romAddress, int x, int y, int lod) {
     int hashIndex = (LARGE_PRIME_NUMBER * (u32)romAddress) & tileCache->hashTableMask;
 
     int entryIndex = tileCache->hashTable[hashIndex];
@@ -163,16 +202,16 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, void* romAddress) {
     entryIndex = mtTileCacheRemoveOldestUsedTile(tileCache);
     mtTileCacheAdd(tileCache, entryIndex, hashIndex);
 
-    struct MTTileCacheEntry* entry = &tileCache->entries[entryIndex];
-    mtTileCacheRequestFromRom(tileCache, entry, romAddress);
+    mtTileCacheRequestFromRom(tileCache, entryIndex, romAddress);
+    mtTileCacheFixDisplayList(tileCache, entryIndex, x, y, lod);
     return &tileCache->tileLoaders[entryIndex * MT_GFX_SIZE];
 }
 
 void mtTileCacheWaitForTiles(struct MTTileCache* tileCache) {
-    OSMesg dummyMesg;
+    // OSMesg dummyMesg;
 
-    while (tileCache->pendingMessages > 0) {
-        (void)osRecvMesg(&tileCache->tileQueue, &dummyMesg, OS_MESG_BLOCK);
-        --tileCache->pendingMessages;
-    }
+    // while (tileCache->pendingMessages > 0) {
+    //     (void)osRecvMesg(&tileCache->tileQueue, &dummyMesg, OS_MESG_BLOCK);
+    //     --tileCache->pendingMessages;
+    // }
 }

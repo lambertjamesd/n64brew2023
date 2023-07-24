@@ -6,9 +6,11 @@
 #include "./camera.h"
 #include "../graphics/renderstate.h"
 #include "../graphics/graphics.h"
+#include "../megatextures/megatexture_tilecache.h"
 
 struct Scene {
     struct Camera camera;
+    struct MTTileCache tileCache;
 };
 
 void sceneInit(struct Scene* scene);

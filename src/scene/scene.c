@@ -9,31 +9,40 @@
 
 #include "../util/time.h"
 
+#define TILE_CACHE_ENTRY_COUNT  128
+
 void sceneInit(struct Scene* scene) {
-    cameraInit(&scene->camera, 70.0f, 0.5f * SCENE_SCALE, 30.0f * SCENE_SCALE);
+    cameraInit(&scene->camera, 70.0f, 0.125f * SCENE_SCALE, 20.0f * SCENE_SCALE);
 
     scene->camera.transform.position.x = 0.0f;
     scene->camera.transform.position.y = 1.0f;
     scene->camera.transform.position.z = 2.0f;
+
+    mtTileCacheInit(&scene->tileCache, 128);
 }
 
 extern Vp fullscreenViewport;
 
-int tmp = 0;
-
 void sceneRender(struct Scene* scene, struct RenderState* renderState, struct GraphicsTask* task) {
     struct CameraMatrixInfo cameraInfo;
-    cameraSetupMatrices(&scene->camera, renderState, (float)SCREEN_WD / SCREEN_HT, &fullscreenViewport, 0, &cameraInfo);
+    cameraSetupMatrices(&scene->camera, renderState, (float)SCREEN_WD / SCREEN_HT, &fullscreenViewport, 1, &cameraInfo);
     cameraApplyMatrices(renderState, &cameraInfo);
 
     gSPDisplayList(renderState->dl++, static_vertex_color);
     gSPDisplayList(renderState->dl++, chapel_model_gfx);
 
     gSPDisplayList(renderState->dl++, static_tile_image);
-    gDPSetTile(renderState->dl++, G_IM_FMT_RGBA, G_IM_SIZ_16b, 8, 0, 0, 0, G_TX_CLAMP | G_TX_MIRROR, 5, 0, G_TX_CLAMP | G_TX_MIRROR, 5, 0);
-    megatextureRender(&gLoadedLevel->megatextureIndexes[0], renderState);
+    gDPSetTile(
+        renderState->dl++, 
+        G_IM_FMT_RGBA, 
+        G_IM_SIZ_16b, 8, 0, 0, 0, 
+        G_TX_CLAMP | G_TX_MIRROR, 5, 1, 
+        G_TX_CLAMP | G_TX_MIRROR, 5, 1
+    );
+    gDPSetTileSize(renderState->dl++, 0, 32 << 2, 32 << 2, (32 + 31) << 2, (32 + 31) << 2);
+    megatextureRender(&scene->tileCache, &gLoadedLevel->megatextureIndexes[0], &cameraInfo.cullingInformation, renderState);
 
-    ++tmp;
+    mtTileCacheWaitForTiles(&scene->tileCache);
 }
 
 void playerGetMoveBasis(struct Transform* transform, struct Vector3* forward, struct Vector3* right) {
@@ -80,4 +89,16 @@ void sceneUpdate(struct Scene* scene) {
 
     vector3AddScaled(&scene->camera.transform.position, &forward, frontToBack * FIXED_DELTA_TIME, &scene->camera.transform.position);
     vector3AddScaled(&scene->camera.transform.position, &right, sideToSide * FIXED_DELTA_TIME, &scene->camera.transform.position);
+
+    OSContPad* pad = controllersGetControllerData(0);
+
+    // yaw
+    struct Quaternion deltaRotate;
+    quatAxisAngle(&gUp, -pad->stick_x * FIXED_DELTA_TIME * (1.0f / 80.0f), &deltaRotate);
+    struct Quaternion tempRotation;
+    quatMultiply(&deltaRotate, &scene->camera.transform.rotation, &tempRotation);
+
+    // pitch
+    quatAxisAngle(&gRight, pad->stick_y * FIXED_DELTA_TIME * (1.0f / 80.0f), &deltaRotate);
+    quatMultiply(&tempRotation, &deltaRotate, &scene->camera.transform.rotation);
 }

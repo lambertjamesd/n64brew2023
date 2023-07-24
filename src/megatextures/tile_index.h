@@ -2,6 +2,8 @@
 #define __MEGATEXTURE_TILE_INDEX_H__
 
 #include <ultra64.h>
+#include "../math/boxs16.h"
+#include "../math/vector3.h"
 
 struct MTMeshTile {
     u16 startVertex;
@@ -26,6 +28,7 @@ struct MTTileLayer {
     u64* tileSource;
     u8 xTiles;
     u8 yTiles;
+    u8 lod;
 
     struct MTMeshLayer mesh;
 };
@@ -33,6 +36,10 @@ struct MTTileLayer {
 struct MTTileIndex {
     struct MTTileLayer* layers;
     u8 layerCount;
+    struct BoundingBoxs16 boundingBox;
+    struct Vector3 uvOrigin;
+    struct Vector3 uvRight;
+    struct Vector3 uvUp;
 };
 
 #endif

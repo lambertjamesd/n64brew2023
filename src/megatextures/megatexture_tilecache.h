@@ -4,8 +4,8 @@
 #include <ultra64.h>
 
 #define MT_TILE_SIZE   (32 * 32 * 2)
-#define MT_TILE_WORDS  (TILE_SIZE / sizeof(u64))
-#define MT_GFX_SIZE    8
+#define MT_TILE_WORDS  (MT_TILE_SIZE / sizeof(u64))
+#define MT_GFX_SIZE    10
 
 #define MT_TILE_QUEUE_SIZE     64
 
@@ -28,16 +28,18 @@ struct MTTileCache {
     u64* tileData;
     Gfx* tileLoaders;
     OSMesgQueue tileQueue;
-    OSMesg messages[MT_TILE_QUEUE_SIZE];
+    OSMesg inboundMessages[MT_TILE_QUEUE_SIZE];
+    OSIoMesg outboundMessages[MT_TILE_QUEUE_SIZE];
     u16 pendingMessages;
+    u16 nextOutboundMessage;
     u16 entryCount;
     u16 hashTableMask;
     u16 oldestUsedTile;
     u16 newestUsedTile;
 };
 
-void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount, OSPiHandle* piHandle);
-Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, void* romAddress);
+void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount);
+Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, void* romAddress, int x, int y, int lod);
 void mtTileCacheWaitForTiles(struct MTTileCache* tileCache);
 
 #endif
