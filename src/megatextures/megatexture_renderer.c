@@ -74,10 +74,45 @@ void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index,
         }
 
         mtCullingLoopSplit(&cullingLoop, &clippingPlane, NULL);
+
+        if (cullingLoop.loopSize == 0) {
+            // the plane is entirely outside the view
+            return;
+        }
     }
 
+    int leftIndex = mtCullingLoopTopIndex(&cullingLoop);
+    int rightIndex = leftIndex;
+
+    float lastLeftBoundary = cullingLoop.loop[leftIndex].x;
+    float lastRightBoundary = lastLeftBoundary;
+
     struct MTTileLayer* topLayer = &index->layers[0];
-    for (int row = topLayer->mesh.minTileY; row < topLayer->mesh.maxTileY; ++row) {
-        megatextureRenderRow(tileCache, topLayer, row, topLayer->mesh.minTileX, topLayer->mesh.maxTileX, renderState);
+
+    float tileStep = 1.0f / topLayer->yTiles;
+    float nextBoundary = tileStep * (topLayer->mesh.minTileY + 1);
+
+    if (topLayer->mesh.minTileY) {
+        mtCullingLoopFindExtent(&cullingLoop, &leftIndex, &lastLeftBoundary, topLayer->mesh.minTileY * tileStep, 1);
+        mtCullingLoopFindExtent(&cullingLoop, &rightIndex, &lastRightBoundary, topLayer->mesh.minTileY * tileStep, -1);
+    }
+
+    for (int row = topLayer->mesh.minTileY; row < topLayer->mesh.maxTileY; ++row, nextBoundary += tileStep) {
+        float minX = mtCullingLoopFindExtent(&cullingLoop, &leftIndex, &lastLeftBoundary, nextBoundary, 1);
+        float maxX = mtCullingLoopFindExtent(&cullingLoop, &rightIndex, &lastRightBoundary, nextBoundary, -1);
+
+        if (minX == maxX) {
+            // empty row
+            continue;
+        }
+
+        megatextureRenderRow(
+            tileCache, 
+            topLayer, 
+            row, 
+            MAX(topLayer->mesh.minTileX, (int)floorf(minX * topLayer->xTiles)), 
+            MIN(topLayer->mesh.maxTileX, (int)ceilf(maxX * topLayer->xTiles)), 
+            renderState
+        );
     }
 }

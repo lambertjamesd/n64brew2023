@@ -17,6 +17,9 @@ struct MTCullingLoop {
 void mtCullingLoopInit(struct MTCullingLoop* loop);
 void mtCullingLoopSplit(struct MTCullingLoop* loop, struct Plane2* plane, struct MTCullingLoop* behindPlane);
 
+int mtCullingLoopTopIndex(struct MTCullingLoop* loop);
+float mtCullingLoopFindExtent(struct MTCullingLoop* loop, int* currentIndex, float* lastBoundaryExtent, float until, int direction);
+
 void mtProjectClippingPlane(struct Plane* plane, struct MTUVBasis* uvBasis, struct Plane2* result);
 
 #endif

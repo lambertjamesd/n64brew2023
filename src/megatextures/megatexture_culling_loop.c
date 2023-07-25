@@ -73,6 +73,83 @@ void mtCullingLoopSplit(struct MTCullingLoop* loop, struct Plane2* plane, struct
     loop->loopSize = frontPlane.loopSize;
 }
 
+
+int mtCullingLoopTopIndex(struct MTCullingLoop* loop) {
+    int result = 0;
+
+    int nextPoint = 1;
+    int prevPoint = loop->loopSize - 1;
+
+    for (int i = 0; i < loop->loopSize; ++i) {
+        if (loop->loop[nextPoint].y < loop->loop[result].y) {
+            prevPoint = result;
+            result = nextPoint;
+            nextPoint = (nextPoint == loop->loopSize - 1) ? 0 : nextPoint + 1;
+            continue;
+        }
+
+        if (loop->loop[prevPoint].y < loop->loop[result].y) {
+            nextPoint = result;
+            result = prevPoint;
+            prevPoint = prevPoint == 0 ? loop->loopSize - 1 : prevPoint - 1;
+            continue;
+        }
+
+        break;
+    }
+
+    return result;
+}
+
+float mtCullingLoopFindExtent(struct MTCullingLoop* loop, int* currentIndex, float* lastBoundaryExtent, float until, int direction) {
+    float result = *lastBoundaryExtent;
+
+    // infinite loop guard
+    for (int i = 0; i < loop->loopSize; ++i) {
+        int nextPointIndex = *currentIndex + direction;
+
+        if (nextPointIndex == -1) {
+            nextPointIndex = loop->loopSize - 1;
+        } else if (nextPointIndex == loop->loopSize) {
+            nextPointIndex = 0;
+        }
+
+        struct Vector2* currentPoint = &loop->loop[*currentIndex];
+
+        if (currentPoint->y > until) {
+            // if the boundary is before the current point
+            // the exit early
+            return result;
+        }
+
+        struct Vector2* nextPoint = &loop->loop[nextPointIndex];
+
+        if (nextPoint->y < currentPoint->y) {
+            return result;
+        }
+
+        if (nextPoint->y <= until || nextPoint->y == currentPoint->y) {
+            if ((direction > 0) == (nextPoint->x < result)) {
+                result = nextPoint->x;
+            }
+
+            *currentIndex = nextPointIndex;
+            continue;
+        }
+
+        float lerpValue = mathfInvLerp(currentPoint->y, nextPoint->y, until);
+        *lastBoundaryExtent = mathfLerp(currentPoint->x, nextPoint->x, lerpValue);
+
+        if ((direction > 0) == (*lastBoundaryExtent < result)) {
+            result = *lastBoundaryExtent;
+        }
+
+        break;
+    }
+
+    return result;
+}
+
 void mtProjectClippingPlane(struct Plane* plane, struct MTUVBasis* uvBasis, struct Plane2* result) {
     result->normal.x = vector3Dot(&plane->normal, &uvBasis->uvRight);
     result->normal.y = vector3Dot(&plane->normal, &uvBasis->uvUp);
