@@ -25,7 +25,7 @@ extern Vp fullscreenViewport;
 
 void sceneRender(struct Scene* scene, struct RenderState* renderState, struct GraphicsTask* task) {
     struct CameraMatrixInfo cameraInfo;
-    cameraSetupMatrices(&scene->camera, renderState, (float)SCREEN_WD / SCREEN_HT, &fullscreenViewport, 1, &cameraInfo);
+    cameraSetupMatrices(&scene->camera, renderState, (float)SCREEN_WD / SCREEN_HT, 1, &cameraInfo);
     cameraApplyMatrices(renderState, &cameraInfo);
 
     gSPDisplayList(renderState->dl++, static_vertex_color);
@@ -40,7 +40,7 @@ void sceneRender(struct Scene* scene, struct RenderState* renderState, struct Gr
         G_TX_CLAMP | G_TX_MIRROR, 5, 1
     );
     gDPSetTileSize(renderState->dl++, 0, 32 << 2, 32 << 2, (32 + 31) << 2, (32 + 31) << 2);
-    megatextureRender(&scene->tileCache, &gLoadedLevel->megatextureIndexes[0], &cameraInfo.cullingInformation, renderState);
+    megatextureRender(&scene->tileCache, &gLoadedLevel->megatextureIndexes[0], &cameraInfo, renderState);
 
     mtTileCacheWaitForTiles(&scene->tileCache);
 }

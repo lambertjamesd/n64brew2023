@@ -74,23 +74,31 @@ int cameraIsValidMatrix(float matrix[4][4]) {
     return fabsf(matrix[3][0]) <= 0x7fff && fabsf(matrix[3][1]) <= 0x7fff && fabsf(matrix[3][2]) <= 0x7fff;
 }
 
-int cameraSetupMatrices(struct Camera* camera, struct RenderState* renderState, float aspectRatio, Vp* viewport, int extractClippingPlanes, struct CameraMatrixInfo* output) {
+int cameraSetupMatrices(struct Camera* camera, struct RenderState* renderState, float aspectRatio, int extractClippingPlanes, struct CameraMatrixInfo* output) {
     float view[4][4];
-    float persp[4][4];
     float combined[4][4];
 
-    float scaleX = viewport->vp.vscale[0] * (1.0f / (SCREEN_WD << 1));
-    float scaleY = viewport->vp.vscale[1] * (1.0f / (SCREEN_HT << 1));
+	float fovy = camera->fov * 3.1415926 / 180.0;
+    output->cotFov = cosf (fovy/2) / sinf (fovy/2);
+    output->nearPlane = camera->nearPlane * (1.0f / SCENE_SCALE);
+    output->farPlane = camera->farPlane * (1.0f / SCENE_SCALE);
 
-    float centerX = ((float)viewport->vp.vtrans[0] - (SCREEN_WD << 1)) * (1.0f / (SCREEN_WD << 1));
-    float centerY = ((SCREEN_HT << 1) - (float)viewport->vp.vtrans[1]) * (1.0f / (SCREEN_HT << 1));
+    quatMultVector(&camera->transform.rotation, &gForward, &output->forwardVector);
+    vector3Negate(&output->forwardVector, &output->forwardVector);
+    output->cameraPosition = camera->transform.position;
 
-    guOrthoF(combined, centerX - scaleX, centerX + scaleX, centerY - scaleY, centerY + scaleY, 1.0f, -1.0f, 1.0f);
-    cameraBuildProjectionMatrix(camera, view, &output->perspectiveNormalize, aspectRatio);
-    guMtxCatF(view, combined, persp);
+    cameraBuildProjectionMatrix(camera, output->projectionMatrix, &output->perspectiveNormalize, aspectRatio);
 
     cameraBuildViewMatrix(camera, view);
-    guMtxCatF(view, persp, combined);
+
+    output->viewMtx = renderStateRequestMatrices(renderState, 1);
+
+    if (!output->viewMtx) {
+        return 0;
+    }
+
+    guMtxF2L(view, output->viewMtx);
+    guMtxCatF(view, output->projectionMatrix, combined);
 
     if (!cameraIsValidMatrix(combined)) {
         goto error;

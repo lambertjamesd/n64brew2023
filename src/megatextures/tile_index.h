@@ -31,6 +31,8 @@ struct MTTileLayer {
     u8 lod;
 
     struct MTMeshLayer mesh;
+
+    float worldPixelSize;
 };
 
 struct MTUVBasis {

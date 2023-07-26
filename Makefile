@@ -116,7 +116,7 @@ build/%.fbx: %.blend
 	@mkdir -p $(@D)
 	$(BLENDER_3_0) $< --background --python tools/export_fbx.py -- $@
 
-build/assets/world/%.h build/assets/world/%_geo.c: build/assets/world/%.fbx build/assets/materials/static.h $(SKELATOOL64) $(TEXTURE_IMAGES) $(LUA_FILES)
+build/assets/world/%.h build/assets/world/%_geo.c build/assets/world/%_img.c: build/assets/world/%.fbx build/assets/materials/static.h $(SKELATOOL64) $(TEXTURE_IMAGES) $(LUA_FILES)
 	$(SKELATOOL64) --script tools/export_level.lua --fixed-point-scale ${SCENE_SCALE} --model-scale 0.01 --name $(<:build/assets/world/%.fbx=%) -m assets/materials/static.skm.yaml -o $(<:%.fbx=%.h) $<
 
 build/assets/world/%.o: build/assets/world/%.c build/assets/materials/static.h

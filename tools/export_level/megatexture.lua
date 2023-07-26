@@ -623,6 +623,7 @@ local function write_tile_index(world_mesh, megatexture_model)
             yTiles = layer.tile_count_y,
             lod = lod - 1,
             mesh = write_mesh_tiles(megatexture_model, layer),
+            worldPixelSize = megatexture_model.uv_basis.right:magnitude() / layer.texture.width,
         })
     end
 

@@ -4,6 +4,7 @@
 
 #include "./megatexture_culling_loop.h"
 #include "../math/mathf.h"
+#include "../graphics/graphics.h"
 
 void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileLayer* layer, int row, int minX, int maxX, struct RenderState* renderState) {
     int currentVertexCount = 0;
@@ -50,8 +51,12 @@ void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileLayer* lay
     gSPVertex(vertexCopyCommand, &layer->mesh.vertices[startVertex], currentVertexCount, 0);
 }
 
-void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, struct FrustrumCullingInformation* cullingPlanes, struct RenderState* renderState) {
-    if (isOutsideFrustrum(cullingPlanes, &index->boundingBox)) {
+float megatextureDetermineMipBoundary(struct CameraMatrixInfo* cameraInfo, struct MTUVBasis* basis, float worldPixelSize, float targetScreenSize) {
+    return cameraInfo->cotFov * (0.5f * SCREEN_HT) * worldPixelSize / targetScreenSize;
+}
+
+void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState) {
+    if (isOutsideFrustrum(&cameraInfo->cullingInformation, &index->boundingBox)) {
         return;
     }
 
@@ -59,9 +64,9 @@ void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index,
 
     mtCullingLoopInit(&cullingLoop);
 
-    for (int i = 0; i < cullingPlanes->usedClippingPlaneCount; ++i) {
+    for (int i = 0; i < cameraInfo->cullingInformation.usedClippingPlaneCount; ++i) {
         struct Plane2 clippingPlane;
-        mtProjectClippingPlane(&cullingPlanes->clippingPlanes[i], &index->uvBasis, &clippingPlane);
+        mtProjectClippingPlane(&cameraInfo->cullingInformation.clippingPlanes[i], &index->uvBasis, &clippingPlane);
 
         if (fabsf(clippingPlane.normal.x) < 0.000001f && fabsf(clippingPlane.normal.y) < 0.000001f) {
             if (clippingPlane.d < 0.0f) {
@@ -81,38 +86,88 @@ void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index,
         }
     }
 
-    int leftIndex = mtCullingLoopTopIndex(&cullingLoop);
-    int rightIndex = leftIndex;
+    float prevPlane = cameraInfo->nearPlane;
 
-    float lastLeftBoundary = cullingLoop.loop[leftIndex].x;
-    float lastRightBoundary = lastLeftBoundary;
+    for (int layerIndex = 0; layerIndex < index->layerCount; ++layerIndex) {
+        struct MTTileLayer* layer = &index->layers[layerIndex];
 
-    struct MTTileLayer* topLayer = &index->layers[0];
+        float clippingPlaneDistance = megatextureDetermineMipBoundary(cameraInfo, &index->uvBasis, layer->worldPixelSize, 1.0f);
+        
+        struct Plane mipClippingPlane;
+        mipClippingPlane.normal = cameraInfo->forwardVector;
+        mipClippingPlane.d = -SCENE_SCALE * (vector3Dot(&mipClippingPlane.normal, &cameraInfo->cameraPosition) + clippingPlaneDistance);
 
-    float tileStep = 1.0f / topLayer->yTiles;
-    float nextBoundary = tileStep * (topLayer->mesh.minTileY + 1);
+        struct Plane2 clippingPlane;
+        mtProjectClippingPlane(&mipClippingPlane, &index->uvBasis, &clippingPlane);
 
-    if (topLayer->mesh.minTileY) {
-        mtCullingLoopFindExtent(&cullingLoop, &leftIndex, &lastLeftBoundary, topLayer->mesh.minTileY * tileStep, 1);
-        mtCullingLoopFindExtent(&cullingLoop, &rightIndex, &lastRightBoundary, topLayer->mesh.minTileY * tileStep, -1);
-    }
+        struct MTCullingLoop currentLoop;
 
-    for (int row = topLayer->mesh.minTileY; row < topLayer->mesh.maxTileY; ++row, nextBoundary += tileStep) {
-        float minX = mtCullingLoopFindExtent(&cullingLoop, &leftIndex, &lastLeftBoundary, nextBoundary, 1);
-        float maxX = mtCullingLoopFindExtent(&cullingLoop, &rightIndex, &lastRightBoundary, nextBoundary, -1);
+        if (fabsf(clippingPlane.normal.x) < 0.000001f && fabsf(clippingPlane.normal.y) < 0.000001f) {
+            if (clippingPlane.d < 0.0f && layerIndex < index->layerCount - 1) {
+                continue;
+            }
 
-        if (minX == maxX) {
-            // empty row
+            currentLoop = cullingLoop;
+            cullingLoop.loopSize = 0;
+        } else {
+            mtCullingLoopSplit(&cullingLoop, &clippingPlane, &currentLoop);
+        }
+
+        if (clippingPlaneDistance <= prevPlane && layerIndex < index->layerCount - 1) {
             continue;
         }
 
-        megatextureRenderRow(
-            tileCache, 
-            topLayer, 
-            row, 
-            MAX(topLayer->mesh.minTileX, (int)floorf(minX * topLayer->xTiles)), 
-            MIN(topLayer->mesh.maxTileX, (int)ceilf(maxX * topLayer->xTiles)), 
-            renderState
-        );
+        float nearPlane = prevPlane * SCENE_SCALE;
+        float farPlane = clippingPlaneDistance * SCENE_SCALE;
+
+        cameraInfo->projectionMatrix[2][2] = (nearPlane + farPlane) / (nearPlane - farPlane);
+        cameraInfo->projectionMatrix[3][2] = (2 * nearPlane * farPlane) / (nearPlane - farPlane);
+
+        prevPlane = clippingPlaneDistance;
+
+        if (currentLoop.loopSize == 0) {
+            // the plane is entirely outside the view
+            continue;;
+        }
+
+        int leftIndex = mtCullingLoopTopIndex(&currentLoop);
+        int rightIndex = leftIndex;
+
+        float lastLeftBoundary = currentLoop.loop[leftIndex].x;
+        float lastRightBoundary = lastLeftBoundary;
+
+
+        float tileStep = 1.0f / layer->yTiles;
+        float nextBoundary = tileStep * (layer->mesh.minTileY + 1);
+
+        if (layer->mesh.minTileY) {
+            mtCullingLoopFindExtent(&currentLoop, &leftIndex, &lastLeftBoundary, layer->mesh.minTileY * tileStep, 1);
+            mtCullingLoopFindExtent(&currentLoop, &rightIndex, &lastRightBoundary, layer->mesh.minTileY * tileStep, -1);
+        }
+
+        for (int row = layer->mesh.minTileY; row < layer->mesh.maxTileY; ++row, nextBoundary += tileStep) {
+            float minX = mtCullingLoopFindExtent(&currentLoop, &leftIndex, &lastLeftBoundary, nextBoundary, 1);
+            float maxX = mtCullingLoopFindExtent(&currentLoop, &rightIndex, &lastRightBoundary, nextBoundary, -1);
+
+            if (minX == maxX) {
+                // empty row
+                continue;
+            }
+
+
+            Mtx* projection = renderStateRequestMatrices(renderState, 1);   
+            guMtxF2L(cameraInfo->projectionMatrix, projection);
+            gSPMatrix(renderState->dl++, projection, G_MTX_LOAD | G_MTX_PROJECTION | G_MTX_NOPUSH);
+            gSPMatrix(renderState->dl++, cameraInfo->viewMtx, G_MTX_MUL | G_MTX_PROJECTION | G_MTX_NOPUSH);
+
+            megatextureRenderRow(
+                tileCache, 
+                layer, 
+                row, 
+                MAX(layer->mesh.minTileX, (int)floorf(minX * layer->xTiles)), 
+                MIN(layer->mesh.maxTileX, (int)ceilf(maxX * layer->xTiles)), 
+                renderState
+            );
+        }
     }
 }

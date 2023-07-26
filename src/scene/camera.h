@@ -28,8 +28,17 @@ struct FrustrumCullingInformation {
 
 struct CameraMatrixInfo {
     Mtx* projectionView;
+    Mtx* viewMtx;
+    float projectionMatrix[4][4];
     u16 perspectiveNormalize;
     struct FrustrumCullingInformation cullingInformation;
+
+    struct Vector3 forwardVector;
+    struct Vector3 cameraPosition;
+
+    float cotFov;
+    float nearPlane;
+    float farPlane;
 };
 
 int isOutsideFrustrum(struct FrustrumCullingInformation* frustrum, struct BoundingBoxs16* boundingBox);
@@ -38,7 +47,7 @@ int isSphereOutsideFrustrum(struct FrustrumCullingInformation* frustrum, struct 
 void cameraInit(struct Camera* camera, float fov, float near, float far);
 void cameraBuildViewMatrix(struct Camera* camera, float matrix[4][4]);
 void cameraBuildProjectionMatrix(struct Camera* camera, float matrix[4][4], u16* perspectiveNorm, float aspectRatio);
-int cameraSetupMatrices(struct Camera* camera, struct RenderState* renderState, float aspectRatio, Vp* viewport, int extractClippingPlanes, struct CameraMatrixInfo* output);
+int cameraSetupMatrices(struct Camera* camera, struct RenderState* renderState, float aspectRatio, int extractClippingPlanes, struct CameraMatrixInfo* output);
 
 int cameraApplyMatrices(struct RenderState* renderState, struct CameraMatrixInfo* matrixInfo);
 
