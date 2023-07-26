@@ -1,12 +1,10 @@
 #include "./level_definition.h"
 
-struct MTTileIndex* levelDefinitionFixTileIndexPointers(struct MTTileIndex* tileIndex, u32 pointerOffset, u32 imagePointerOffset) {
-    struct MTTileIndex* result = ADJUST_POINTER_POS(tileIndex, pointerOffset);
+void levelDefinitionFixTileIndexPointers(struct MTTileIndex* tileIndex, u32 pointerOffset, u32 imagePointerOffset) {
+    tileIndex->layers = ADJUST_POINTER_POS(tileIndex->layers, pointerOffset);
 
-    result->layers = ADJUST_POINTER_POS(result->layers, pointerOffset);
-
-    for (int i = 0; i < result->layerCount; ++i) {
-        struct MTTileLayer* layer = &result->layers[i];
+    for (int i = 0; i < tileIndex->layerCount; ++i) {
+        struct MTTileLayer* layer = &tileIndex->layers[i];
 
         layer->mesh.vertices = ADJUST_POINTER_POS(layer->mesh.vertices, pointerOffset);
         layer->mesh.indices = ADJUST_POINTER_POS(layer->mesh.indices, pointerOffset);
@@ -14,14 +12,16 @@ struct MTTileIndex* levelDefinitionFixTileIndexPointers(struct MTTileIndex* tile
 
         layer->tileSource = ADJUST_POINTER_POS(layer->tileSource, imagePointerOffset);
     }
-
-    return result;
 }
 
 struct LevelDefinition* levelDefinitionFixPointers(struct LevelDefinition* source, u32 pointerOffset, u32 imagePointerOffset) {
     struct LevelDefinition* result = ADJUST_POINTER_POS(source, pointerOffset);
 
-    result->megatextureIndexes = levelDefinitionFixTileIndexPointers(result->megatextureIndexes, pointerOffset, imagePointerOffset);
+    result->megatextureIndexes = ADJUST_POINTER_POS(result->megatextureIndexes, pointerOffset);
+
+    for (int i = 0; i < result->megatextureIndexcount; ++i) {
+        levelDefinitionFixTileIndexPointers(&result->megatextureIndexes[i], pointerOffset, imagePointerOffset);
+    }
 
     return result;
 }

@@ -144,6 +144,12 @@ void mtTileCacheRequestFromRom(struct MTTileCache* tileCache, int entryIndex, vo
 
     entry->romAddress = romAddress;
 
+    if (tileCache->pendingMessages == MT_TILE_QUEUE_SIZE) {
+        OSMesg dummyMesg;
+        (void)osRecvMesg(&tileCache->tileQueue, &dummyMesg, OS_MESG_BLOCK);
+        --tileCache->pendingMessages;
+    }
+
     OSIoMesg* dmaIoMesgBuf = &tileCache->outboundMessages[tileCache->nextOutboundMessage];
     ++tileCache->nextOutboundMessage;
 
@@ -156,12 +162,6 @@ void mtTileCacheRequestFromRom(struct MTTileCache* tileCache, int entryIndex, vo
     dmaIoMesgBuf->dramAddr     = (void*)&tileCache->tileData[entryIndex * MT_TILE_WORDS];
     dmaIoMesgBuf->devAddr      = (u32)romAddress;
     dmaIoMesgBuf->size         = MT_TILE_SIZE;
-
-    if (tileCache->pendingMessages == MT_TILE_QUEUE_SIZE) {
-        OSMesg dummyMesg;
-        (void)osRecvMesg(&tileCache->tileQueue, &dummyMesg, OS_MESG_BLOCK);
-        --tileCache->pendingMessages;
-    }
 
     osEPiStartDma(tileCache->piHandle, dmaIoMesgBuf, OS_READ);
     ++tileCache->pendingMessages;
@@ -208,10 +208,10 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, void* romAddress, int
 }
 
 void mtTileCacheWaitForTiles(struct MTTileCache* tileCache) {
-    // OSMesg dummyMesg;
+    OSMesg dummyMesg;
 
-    // while (tileCache->pendingMessages > 0) {
-    //     (void)osRecvMesg(&tileCache->tileQueue, &dummyMesg, OS_MESG_BLOCK);
-    //     --tileCache->pendingMessages;
-    // }
+    while (tileCache->pendingMessages > 0) {
+        (void)osRecvMesg(&tileCache->tileQueue, &dummyMesg, OS_MESG_BLOCK);
+        --tileCache->pendingMessages;
+    }
 }

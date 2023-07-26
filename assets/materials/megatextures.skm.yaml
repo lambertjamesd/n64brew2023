@@ -1,0 +1,12 @@
+materials:
+  parrot_test:
+    gDPSetTile:
+      filename: ./megatextures/test.jpg
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
+      
+  window_mid:
+    gDPSetTile:
+      filename: ./megatextures/Mid_Campfire.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b

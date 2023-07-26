@@ -40,7 +40,10 @@ void sceneRender(struct Scene* scene, struct RenderState* renderState, struct Gr
         G_TX_CLAMP | G_TX_MIRROR, 5, 1
     );
     gDPSetTileSize(renderState->dl++, 0, 32 << 2, 32 << 2, (32 + 31) << 2, (32 + 31) << 2);
-    megatextureRender(&scene->tileCache, &gLoadedLevel->megatextureIndexes[0], &cameraInfo, renderState);
+
+    for (int i = 0; i < gLoadedLevel->megatextureIndexcount; ++i) {
+        megatextureRender(&scene->tileCache, &gLoadedLevel->megatextureIndexes[i], &cameraInfo, renderState);
+    }
 
     mtTileCacheWaitForTiles(&scene->tileCache);
 }

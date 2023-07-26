@@ -7,6 +7,31 @@ local function debug_print_recursive(any, line_prefix, already_visited)
     if type(any) == 'table' then
         local metatable = getmetatable(any)
 
+        if metatable and metatable.__len then
+            if already_visited[any] then
+                io.write('<already printed>')
+                return
+            end
+    
+            already_visited[any] = true
+
+            io.write('{\n')
+
+            for i = 1, #any do
+                io.write('  ')
+                io.write(line_prefix)
+                debug_print_recursive(i, '  ' .. line_prefix, already_visited)
+                io.write(' = ')
+                debug_print_recursive(any[i], '  ' .. line_prefix, already_visited)
+                io.write(',\n')
+            end
+
+            io.write(line_prefix)
+            io.write('}')
+
+            return
+        end
+
         if metatable and metatable.__tostring then
             io.write(tostring(any))
             return
@@ -126,6 +151,8 @@ local function build_mesh_outline(model)
     return edge_loops
 end
 
+local POINT_ON_EDGE_THRESHOLD = 0.0000001
+
 local function split_mesh_loop(edge_loop, plane)
     local loop_behind = {}
     local loop_ahead = {}
@@ -136,24 +163,22 @@ local function split_mesh_loop(edge_loop, plane)
 
         local distance = plane:distance_to_point(curr)
 
-        if distance < 0 then
+        if math.abs(distance) < POINT_ON_EDGE_THRESHOLD then
+            table.insert(loop_behind, curr)
+            table.insert(loop_ahead, curr)
+
+            distance = 0
+        elseif distance < 0 then
             table.insert(loop_behind, curr)
         else
             table.insert(loop_ahead, curr)
         end
 
         local next_distance = plane:distance_to_point(next)
-
-        if distance * next_distance <= 0 then
-            local lerp = 0
+            
+        if math.abs(next_distance) >= POINT_ON_EDGE_THRESHOLD and distance * next_distance < 0 then
             local total_distance = distance - next_distance
-
-            if math.abs(total_distance) < 0.0000001 then
-                lerp = 0.5
-            else
-                lerp = distance / total_distance
-            end
-
+            local lerp = distance / total_distance
             local new_point = curr:lerp(next, lerp)
 
             table.insert(loop_behind, new_point)
@@ -261,6 +286,12 @@ local function determine_uv_pos(model, uv_pos)
     local a = model.uv[2] - model.uv[1]
     local b = model.uv[3] - model.uv[1]
 
+    a_dir = a:normalized()
+
+    b = b - a_dir * a_dir:dot(b)
+    local b_scale = a:magnitude() / b:magnitude()
+    b = b * b_scale
+
     -- | ox | = | ax bx |   | x |    | u |
     -- | oy |   | ay by | * | y | +  | v |
 
@@ -275,6 +306,11 @@ local function determine_uv_pos(model, uv_pos)
 
     local edge_a = model.vertices[2] - model.vertices[1]
     local edge_b = model.vertices[3] - model.vertices[1]
+
+    edge_a_dir = edge_a:normalized()
+
+    edge_b = edge_b - edge_a_dir * edge_a_dir:dot(edge_b)
+    edge_b = edge_b * b_scale
 
     return model.vertices[1] + edge_a * x + edge_b * y
 end
@@ -331,10 +367,10 @@ local function build_tiles_at_lod(uv_basis, normal, edge_loops, texture, lod)
 
     local texture_tiles = {}
 
-    for y = 0, texture.height - 32, 32 do
+    for y = 0, texture.height - 1, 32 do
         local row = {}
 
-        for x = 0, texture.width - 32, 32 do
+        for x = 0, texture.width - 1, 32 do
             table.insert(row, texture:crop(x, y, 32, 32))
         end
 
@@ -557,6 +593,10 @@ local function write_mesh_tiles(megatexture_model, layer)
             local current_loop = cell[1]
             local next_loop = row[x + 1] and row[x + 1][1]
 
+            if not current_loop then
+                current_loop = {}
+            end
+
             if #current_loop > 0 then
                 min_tile_x = math.min(min_tile_x, x)
                 min_tile_y = math.min(min_tile_y, y)
@@ -594,22 +634,36 @@ local function write_mesh_tiles(megatexture_model, layer)
         end
     end
 
+    local tiles_x_bits = calc_bits_needed(max_tile_x + 1 - min_tile_x)
+
+    local tilex_x = 1 << tiles_x_bits;
+
+    local filtered_tiles = {}
+
+    for index, tile in ipairs(tiles) do
+        offset = index - 1
+        x = (offset % layer.tile_count_x) + 1
+        y = (offset // layer.tile_count_x) + 1
+
+        if x >= min_tile_x and x <= min_tile_x + tilex_x and y >= min_tile_y and y <= max_tile_y then
+            table.insert(filtered_tiles, tile)
+        end
+    end
+
     sk_definition_writer.add_definition(megatexture_model.name .. '_vertices_' .. layer.lod, 'Vtx[]', '_geo', vertices)
     sk_definition_writer.add_definition(megatexture_model.name .. '_indices_' .. layer.lod, 'u8[]', '_geo', indices)
-    sk_definition_writer.add_definition(megatexture_model.name .. '_tiles_' .. layer.lod, 'struct MTMeshTile[]', '_geo', tiles)
-
-    local tileXBits = calc_bits_needed(max_tile_x + 1 - min_tile_x)
+    sk_definition_writer.add_definition(megatexture_model.name .. '_tiles_' .. layer.lod, 'struct MTMeshTile[]', '_geo', filtered_tiles)
 
     return {
         vertices = sk_definition_writer.reference_to(vertices, 1),
         indices = sk_definition_writer.reference_to(indices, 1),
-        tiles = sk_definition_writer.reference_to(tiles, 1),
+        tiles = sk_definition_writer.reference_to(filtered_tiles, 1),
 
         minTileX = min_tile_x - 1,
         minTileY = min_tile_y - 1,
         maxTileX = max_tile_x,
         maxTileY = max_tile_y,
-        tileXBits = tileXBits,
+        tileXBits = tiles_x_bits,
     }
 end 
 
