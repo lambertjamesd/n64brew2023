@@ -9,7 +9,7 @@
 
 #include "../util/time.h"
 
-#define TILE_CACHE_ENTRY_COUNT  128
+#define TILE_CACHE_ENTRY_COUNT  256
 
 void sceneInit(struct Scene* scene) {
     cameraInit(&scene->camera, 70.0f, 0.125f * SCENE_SCALE, 20.0f * SCENE_SCALE);
