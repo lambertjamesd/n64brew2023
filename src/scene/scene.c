@@ -16,9 +16,11 @@ void sceneInit(struct Scene* scene) {
 
     scene->camera.transform.position.x = 0.0f;
     scene->camera.transform.position.y = 1.0f;
-    scene->camera.transform.position.z = 2.0f;
+    scene->camera.transform.position.z = 6.0f;
 
-    mtTileCacheInit(&scene->tileCache, 128);
+    quatAxisAngle(&gUp, -M_PI * 0.5f, &scene->camera.transform.rotation);
+
+    mtTileCacheInit(&scene->tileCache, TILE_CACHE_ENTRY_COUNT);
 }
 
 extern Vp fullscreenViewport;

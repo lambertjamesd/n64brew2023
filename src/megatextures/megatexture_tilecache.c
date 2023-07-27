@@ -2,6 +2,7 @@
 
 #include "../util/memory.h"
 
+// 1160939981
 #define LARGE_PRIME_NUMBER  2147483647
 
 void mtTileCacheBuildTileLoader(struct MTTileCache* tileCache, int entryIndex) {
@@ -80,7 +81,7 @@ int mtTileCacheRemoveOldestUsedTile(struct MTTileCache* tileCache) {
         if (prevIndex == MT_NO_TILE_INDEX) {
             tileCache->hashTable[entry->hashTableIndex] = entry->nextHashTile;
         } else {
-            struct MTTileCacheEntry* prevTile = &tileCache->entries[hashEntryIndex];
+            struct MTTileCacheEntry* prevTile = &tileCache->entries[prevIndex];
             prevTile->nextHashTile = entry->nextHashTile;
         }
 

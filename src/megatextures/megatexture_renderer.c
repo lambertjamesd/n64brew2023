@@ -103,7 +103,7 @@ void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index,
         struct MTCullingLoop currentLoop;
 
         if (fabsf(clippingPlane.normal.x) < 0.000001f && fabsf(clippingPlane.normal.y) < 0.000001f) {
-            if (clippingPlane.d < 0.0f && layerIndex < index->layerCount - 1) {
+            if (clippingPlane.d > 0.0f && layerIndex < index->layerCount - 1) {
                 continue;
             }
 
