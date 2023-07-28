@@ -683,23 +683,17 @@ local function write_tile_index(world_mesh, megatexture_model)
 
     sk_definition_writer.add_definition(world_mesh.name .. '_layers', 'struct MTTileLayer[]', '_geo', layers)
 
-    local fixed_point_scale = sk_input.settings.fixed_point_scale
-
-    local min_bb = world_mesh.bb.min * fixed_point_scale
-    local max_bb = world_mesh.bb.max * fixed_point_scale
-
     return {
         layers = sk_definition_writer.reference_to(layers, 1),
         layerCount = #layers,
-        boundingBox = {
-            math.floor(min_bb.x + 0.5), math.floor(min_bb.y + 0.5), math.floor(min_bb.z + 0.5),
-            math.floor(max_bb.x + 0.5), math.floor(max_bb.y + 0.5), math.floor(max_bb.z + 0.5),
-        },
+        boundingBox = world_mesh.bb,
         uvBasis = {
-            uvOrigin = megatexture_model.uv_basis.origin * fixed_point_scale,
-            uvRight = megatexture_model.uv_basis.right * fixed_point_scale,
-            uvUp = megatexture_model.uv_basis.up * fixed_point_scale,
+            uvOrigin = megatexture_model.uv_basis.origin,
+            uvRight = megatexture_model.uv_basis.right,
+            uvUp = megatexture_model.uv_basis.up,
+            normal = world_mesh.normals[1],
         },
+        worldPixelSize = megatexture_model.uv_basis.right:magnitude() / megatexture_model.texture.width,
     }
 end
 

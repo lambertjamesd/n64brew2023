@@ -5,15 +5,15 @@
 #include "../graphics/graphics.h"
 #include "../math/mathf.h"
 
-int isOutsideFrustrum(struct FrustrumCullingInformation* frustrum, struct BoundingBoxs16* boundingBox) {
+int isOutsideFrustrum(struct FrustrumCullingInformation* frustrum, struct Box3D* boundingBox) {
     for (int i = 0; i < frustrum->usedClippingPlaneCount; ++i) {
         struct Vector3 closestPoint;
 
         struct Vector3* normal = &frustrum->clippingPlanes[i].normal;
 
-        closestPoint.x = normal->x < 0.0f ? boundingBox->minX : boundingBox->maxX;
-        closestPoint.y = normal->y < 0.0f ? boundingBox->minY : boundingBox->maxY;
-        closestPoint.z = normal->z < 0.0f ? boundingBox->minZ : boundingBox->maxZ;
+        closestPoint.x = normal->x < 0.0f ? boundingBox->min.x : boundingBox->max.x;
+        closestPoint.y = normal->y < 0.0f ? boundingBox->min.y : boundingBox->max.y;
+        closestPoint.z = normal->z < 0.0f ? boundingBox->min.z : boundingBox->max.z;
 
         if (planePointDistance(&frustrum->clippingPlanes[i], &closestPoint) < 0.00001f) {
             return 1;
@@ -67,7 +67,7 @@ void cameraExtractClippingPlane(float viewPersp[4][4], struct Plane* output, int
 
     float mult = 1.0f / sqrtf(vector3MagSqrd(&output->normal));
     vector3Scale(&output->normal, &output->normal, mult);
-    output->d *= mult;
+    output->d *= mult * (1.0f / SCENE_SCALE);
 }
 
 int cameraIsValidMatrix(float matrix[4][4]) {
@@ -98,6 +98,7 @@ int cameraSetupMatrices(struct Camera* camera, struct RenderState* renderState, 
     }
 
     guMtxF2L(view, output->viewMtx);
+    
     guMtxCatF(view, output->projectionMatrix, combined);
 
     if (!cameraIsValidMatrix(combined)) {

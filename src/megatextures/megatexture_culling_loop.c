@@ -15,6 +15,30 @@ void mtCullingLoopInit(struct MTCullingLoop* loop) {
     loop->loopSize = 4;
 }
 
+void mtCullingLoopClip(struct MTCullingLoop* loop, struct MTUVBasis* uvBasis, struct FrustrumCullingInformation* frustrum) {
+    for (int i = 0; i < frustrum->usedClippingPlaneCount; ++i) {
+        struct Plane2 clippingPlane;
+        mtProjectClippingPlane(&frustrum->clippingPlanes[i], uvBasis, &clippingPlane);
+
+        if (fabsf(clippingPlane.normal.x) < 0.000001f && fabsf(clippingPlane.normal.y) < 0.000001f) {
+            if (clippingPlane.d < 0.0f) {
+                // the plane is entirely outside the view
+                return;
+            }
+
+            // the plane is entirely inside the view
+            continue;
+        }
+
+        mtCullingLoopSplit(loop, &clippingPlane, NULL);
+
+        if (loop->loopSize == 0) {
+            // the plane is entirely outside the view
+            return;
+        }
+    }
+}
+
 void mtCullingLoopAdd(struct MTCullingLoop* loop, struct Vector2* point) {
     if (!loop) {
         return;
@@ -148,6 +172,20 @@ float mtCullingLoopFindExtent(struct MTCullingLoop* loop, int* currentIndex, flo
     }
 
     return result;
+}
+
+void mtCullingLoopFurthestPoint(struct MTCullingLoop* loop, struct Vector2* dir, struct Vector2* result) {
+    float distance = vector2Dot(dir, &loop->loop[0]);
+    *result = loop->loop[0];
+
+    for (int i = 1; i < loop->loopSize; ++i) {
+        float distanceCheck = vector2Dot(dir, &loop->loop[i]);
+
+        if (distanceCheck > distance) {
+            distance = distanceCheck;
+            *result = loop->loop[i];
+        }
+    }
 }
 
 void mtProjectClippingPlane(struct Plane* plane, struct MTUVBasis* uvBasis, struct Plane2* result) {

@@ -6,6 +6,7 @@
 #include "../math/vector2.h"
 #include "../math/plane2.h"
 #include "../math/plane.h"
+#include "../scene/camera.h"
 #include "tile_index.h"
 #include <ultra64.h>
 
@@ -15,10 +16,13 @@ struct MTCullingLoop {
 };
 
 void mtCullingLoopInit(struct MTCullingLoop* loop);
+void mtCullingLoopClip(struct MTCullingLoop* loop, struct MTUVBasis* basis, struct FrustrumCullingInformation* frustrum);
 void mtCullingLoopSplit(struct MTCullingLoop* loop, struct Plane2* plane, struct MTCullingLoop* behindPlane);
 
 int mtCullingLoopTopIndex(struct MTCullingLoop* loop);
 float mtCullingLoopFindExtent(struct MTCullingLoop* loop, int* currentIndex, float* lastBoundaryExtent, float until, int direction);
+
+void mtCullingLoopFurthestPoint(struct MTCullingLoop* loop, struct Vector2* dir, struct Vector2* result);
 
 void mtProjectClippingPlane(struct Plane* plane, struct MTUVBasis* uvBasis, struct Plane2* result);
 
