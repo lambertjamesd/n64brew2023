@@ -305,3 +305,28 @@ void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index,
         prevPlane = clippingPlaneDistance;
     }
 }
+
+void megatexturePreload(struct MTTileCache* tileCache, struct MTTileIndex* index) {
+    for (int layerIndex = 0; layerIndex < index->layerCount; ++layerIndex) {
+        struct MTImageLayer* layer = &index->imageLayers[layerIndex];
+
+        if (!layer->isAlwaysLoaded) {
+            continue;
+        }
+
+        for (int y = 0; y < layer->yTiles; ++y) {
+            for (int x = 0; x < layer->xTiles; ++x) {
+                mtTileCachePreloadTile(tileCache, index, x, y, layerIndex);
+            }
+        }
+    }
+}
+
+void megatextureRenderStart(struct MTTileCache* tileCache) {
+    tileCache->oldestTileFromFrame[1] = tileCache->oldestTileFromFrame[0];
+    tileCache->oldestTileFromFrame[0] = MT_NO_TILE_INDEX;
+}
+
+void megatextureRenderEnd(struct MTTileCache* tileCache) {
+    mtTileCacheWaitForTiles(tileCache);
+}

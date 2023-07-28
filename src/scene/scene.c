@@ -9,7 +9,7 @@
 
 #include "../util/time.h"
 
-#define TILE_CACHE_ENTRY_COUNT  512
+#define TILE_CACHE_ENTRY_COUNT  256
 
 void sceneInit(struct Scene* scene) {
     cameraInit(&scene->camera, 70.0f, 0.125f * SCENE_SCALE, 20.0f * SCENE_SCALE);
@@ -21,11 +21,17 @@ void sceneInit(struct Scene* scene) {
     // quatAxisAngle(&gUp, -M_PI * 0.5f, &scene->camera.transform.rotation);
 
     mtTileCacheInit(&scene->tileCache, TILE_CACHE_ENTRY_COUNT);
+
+    for (int i = 0; i < gLoadedLevel->megatextureIndexcount; ++i) {
+        megatexturePreload(&scene->tileCache, &gLoadedLevel->megatextureIndexes[i]);
+    }
 }
 
 extern Vp fullscreenViewport;
 
 void sceneRender(struct Scene* scene, struct RenderState* renderState, struct GraphicsTask* task) {
+    megatextureRenderStart(&scene->tileCache);
+
     struct CameraMatrixInfo cameraInfo;
     cameraSetupMatrices(&scene->camera, renderState, (float)SCREEN_WD / SCREEN_HT, 1, &cameraInfo);
     cameraApplyMatrices(renderState, &cameraInfo);
@@ -47,7 +53,7 @@ void sceneRender(struct Scene* scene, struct RenderState* renderState, struct Gr
         megatextureRender(&scene->tileCache, &gLoadedLevel->megatextureIndexes[i], &cameraInfo, renderState);
     }
 
-    mtTileCacheWaitForTiles(&scene->tileCache);
+    megatextureRenderEnd(&scene->tileCache);
 }
 
 void playerGetMoveBasis(struct Transform* transform, struct Vector3* forward, struct Vector3* right) {

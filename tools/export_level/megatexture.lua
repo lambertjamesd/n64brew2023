@@ -678,7 +678,7 @@ local function write_tile_index(world_mesh, megatexture_model)
             tileSource = get_tiles_reference(layer),
             xTiles = layer.tile_count_x,
             yTiles = layer.tile_count_y,
-            isAlwaysLoaded = layer.tile_count_x <= 2 and layer.tile_count_y <= 2,
+            isAlwaysLoaded = layer.tile_count_x <= 4 and layer.tile_count_y <= 4,
         })
     end
 

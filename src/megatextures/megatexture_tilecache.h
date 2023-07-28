@@ -37,10 +37,15 @@ struct MTTileCache {
     u16 hashTableMask;
     u16 oldestUsedTile;
     u16 newestUsedTile;
+
+    // index 0 is the current frame
+    // index 1 is the previous frame
+    u16 oldestTileFromFrame[2];
 };
 
 void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount);
 Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* index, int x, int y, int lod);
+void mtTileCachePreloadTile(struct MTTileCache* tileCache, struct MTTileIndex* index, int x, int y, int lod);
 void mtTileCacheWaitForTiles(struct MTTileCache* tileCache);
 
 #endif

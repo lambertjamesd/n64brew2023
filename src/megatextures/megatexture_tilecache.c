@@ -2,8 +2,11 @@
 
 #include "../util/memory.h"
 
-// 1160939981
-#define LARGE_PRIME_NUMBER  2147483647
+#define LARGE_PRIME_NUMBER  1160939981
+
+Gfx mtNopDisplayList[] = {gsSPEndDisplayList()};
+
+#define MT_IS_ENTRY_PRELOADED(entry)        ((entry)->newerTile == MT_NO_TILE_INDEX && (entry)->olderTile == MT_NO_TILE_INDEX)
 
 void mtTileCacheBuildTileLoader(struct MTTileCache* tileCache, int entryIndex) {
     Gfx* dl = &tileCache->tileLoaders[entryIndex * MT_GFX_SIZE];
@@ -61,10 +64,18 @@ void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount) {
     osCreateMesgQueue(&tileCache->tileQueue, &tileCache->inboundMessages[0], MT_TILE_QUEUE_SIZE);
     tileCache->pendingMessages = 0;
     tileCache->nextOutboundMessage = 0;
+    tileCache->oldestTileFromFrame[0] = MT_NO_TILE_INDEX;
+    tileCache->oldestTileFromFrame[1] = MT_NO_TILE_INDEX;
 }
 
 int mtTileCacheRemoveOldestUsedTile(struct MTTileCache* tileCache) {
     int entryIndex = tileCache->oldestUsedTile;
+
+    if (entryIndex == tileCache->oldestTileFromFrame[1]) {
+        // this tile was already used this frame and
+        // there are no more availible tiles
+        return MT_NO_TILE_INDEX;
+    }
 
     struct MTTileCacheEntry* entry = &tileCache->entries[entryIndex];
 
@@ -101,6 +112,11 @@ void mtTileCacheAdd(struct MTTileCache* tileCache, int entryIndex, int hashIndex
     struct MTTileCacheEntry* prevTile = &tileCache->entries[tileCache->newestUsedTile];
     struct MTTileCacheEntry* entry = &tileCache->entries[entryIndex];
 
+    if (tileCache->oldestTileFromFrame[0] == MT_NO_TILE_INDEX) {
+        // mark this as the first tile used ths frame
+        tileCache->oldestTileFromFrame[0] = entryIndex;
+    }
+
     entry->olderTile = tileCache->newestUsedTile;
     entry->newerTile = MT_NO_TILE_INDEX;
 
@@ -116,8 +132,20 @@ void mtTileCacheMarkMostRecent(struct MTTileCache* tileCache, int entryIndex) {
     struct MTTileCacheEntry* entry = &tileCache->entries[entryIndex];
 
     if (entry->newerTile == MT_NO_TILE_INDEX) {
-        // already newest tile
+        // already newest tile or this tile is permanantly loaded
         return;
+    }
+
+    // keep track of which tile is the oldest tile used this frame
+    if (entryIndex == tileCache->oldestTileFromFrame[0]) {
+        tileCache->oldestTileFromFrame[0] = entry->newerTile;
+    }
+    if (entryIndex == tileCache->oldestTileFromFrame[1]) {
+        tileCache->oldestTileFromFrame[1] = entry->newerTile;
+    }
+    
+    if (tileCache->oldestTileFromFrame[0] == MT_NO_TILE_INDEX) {
+        tileCache->oldestTileFromFrame[0] = entryIndex;
     }
 
     // remove from linked list
@@ -184,12 +212,12 @@ void mtTileCacheFixDisplayList(struct MTTileCache* tileCache, int entryIndex, in
     osWritebackDCache(dl - 2, sizeof(Gfx) * 2);
 }
 
-Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* index, int x, int y, int lod) {
-    struct MTImageLayer* imageLayer = &index->imageLayers[lod];
-    u64* romAddress = &imageLayer->tileSource[MT_TILE_WORDS * (x + y * imageLayer->xTiles)];
+#define MT_DETERMINE_ROM_ADDRESS(imageLayer, x, y)  (&(imageLayer)->tileSource[MT_TILE_WORDS * ((x) + (y) * (imageLayer)->xTiles)])
 
-    int hashIndex = (LARGE_PRIME_NUMBER * (u32)romAddress) & tileCache->hashTableMask;
+// the first 11 bits will always be zero. Shifting right leads to fewer collisions-
+#define MT_HASH(tileCache, romAddress) ((LARGE_PRIME_NUMBER * ((u32)(romAddress) >> 11)) & (tileCache)->hashTableMask)
 
+Gfx* mtTileCacheSearch(struct MTTileCache* tileCache, u64* romAddress, int hashIndex) {
     int entryIndex = tileCache->hashTable[hashIndex];
 
     while (entryIndex != MT_NO_TILE_INDEX) {
@@ -203,12 +231,84 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* i
         entryIndex = entry->nextHashTile;
     }
 
-    entryIndex = mtTileCacheRemoveOldestUsedTile(tileCache);
+    return NULL;
+}
+
+Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* index, int x, int y, int lod) {
+    struct MTImageLayer* imageLayer = &index->imageLayers[lod];
+    u64* romAddress = MT_DETERMINE_ROM_ADDRESS(imageLayer, x, y);
+    int hashIndex = MT_HASH(tileCache, romAddress);
+
+    Gfx* result = mtTileCacheSearch(tileCache, romAddress, hashIndex);
+
+    if (result) {
+        return result;
+    }
+
+    int entryIndex = mtTileCacheRemoveOldestUsedTile(tileCache);
+
+    if (entryIndex == MT_NO_TILE_INDEX) {
+        // cant request any new tiles this frame
+        // resort to searching for any existing
+        // loaded tile
+
+        while (lod + 1 < index->layerCount) {
+            ++lod;
+            x >>= 1;
+            y >>= 1;
+
+            imageLayer = &index->imageLayers[lod];
+
+            if (!imageLayer->isAlwaysLoaded) {
+                continue;
+            }
+
+            romAddress = MT_DETERMINE_ROM_ADDRESS(imageLayer, x, y);
+            hashIndex = MT_HASH(tileCache, romAddress);
+            result = mtTileCacheSearch(tileCache, romAddress, hashIndex);
+
+            if (result) {
+                return result;
+            }
+        }
+
+        return mtNopDisplayList;
+    }
+
     mtTileCacheAdd(tileCache, entryIndex, hashIndex);
 
     mtTileCacheRequestFromRom(tileCache, entryIndex, romAddress);
     mtTileCacheFixDisplayList(tileCache, entryIndex, x, y, lod);
     return &tileCache->tileLoaders[entryIndex * MT_GFX_SIZE];
+}
+
+void mtTileCachePreloadTile(struct MTTileCache* tileCache, struct MTTileIndex* index, int x, int y, int lod) {
+    struct MTImageLayer* imageLayer = &index->imageLayers[lod];
+    u64* romAddress = MT_DETERMINE_ROM_ADDRESS(imageLayer, x, y);
+    int hashIndex = MT_HASH(tileCache, romAddress);
+
+    Gfx* result = mtTileCacheSearch(tileCache, romAddress, hashIndex);
+
+    if (result) {
+        // already preloaded
+        return;
+    }
+
+    int entryIndex = mtTileCacheRemoveOldestUsedTile(tileCache);
+
+    if (entryIndex == MT_NO_TILE_INDEX) {
+        // no more space for entries
+        return;
+    }
+
+    mtTileCacheRequestFromRom(tileCache, entryIndex, romAddress);
+    mtTileCacheFixDisplayList(tileCache, entryIndex, x, y, lod);
+
+    // only add to hash table
+    struct MTTileCacheEntry* entry = &tileCache->entries[entryIndex];
+    entry->nextHashTile = tileCache->hashTable[hashIndex];
+    entry->hashTableIndex = hashIndex;
+    tileCache->hashTable[hashIndex] = entryIndex;
 }
 
 void mtTileCacheWaitForTiles(struct MTTileCache* tileCache) {
