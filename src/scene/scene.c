@@ -9,7 +9,7 @@
 
 #include "../util/time.h"
 
-#define TILE_CACHE_ENTRY_COUNT  256
+#define TILE_CACHE_ENTRY_COUNT  512
 
 void sceneInit(struct Scene* scene) {
     cameraInit(&scene->camera, 70.0f, 0.125f * SCENE_SCALE, 20.0f * SCENE_SCALE);
@@ -18,7 +18,7 @@ void sceneInit(struct Scene* scene) {
     scene->camera.transform.position.y = 1.0f;
     scene->camera.transform.position.z = 6.0f;
 
-    quatAxisAngle(&gUp, -M_PI * 0.5f, &scene->camera.transform.rotation);
+    // quatAxisAngle(&gUp, -M_PI * 0.5f, &scene->camera.transform.rotation);
 
     mtTileCacheInit(&scene->tileCache, TILE_CACHE_ENTRY_COUNT);
 }

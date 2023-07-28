@@ -85,9 +85,14 @@ void megatextureDetermineMipLevels(struct MTUVBasis* uvBasis, float worldPixelWi
         cameraSpacePos.x = cameraOrigin.x + uvSpacePos.x * cameraRight.x + uvSpacePos.y * cameraUp.x;
         cameraSpacePos.y = cameraOrigin.y + uvSpacePos.x * cameraRight.y + uvSpacePos.y * cameraUp.y;
 
-        struct Vector2 crossTexelPos;
-        vector2Add(&cameraSpacePos, &texelOffset, &crossTexelPos);
-        float crossSize = fabsf(mtScreenSpace(cameraInfo, &cameraSpacePos) - mtScreenSpace(cameraInfo, &crossTexelPos));
+        float crossSize = mtScreenSpace(cameraInfo, &cameraSpacePos);
+
+        vector2Add(&uvSpacePos, &texelOffset, &uvSpacePos);
+        cameraSpacePos.x = cameraOrigin.x + uvSpacePos.x * cameraRight.x + uvSpacePos.y * cameraUp.x;
+        cameraSpacePos.y = cameraOrigin.y + uvSpacePos.x * cameraRight.y + uvSpacePos.y * cameraUp.y;
+
+        crossSize = fabsf(crossSize - mtScreenSpace(cameraInfo, &cameraSpacePos));
+
         cameraSpacePos.x = worldPixelWidth;
         float pixelArea = mtScreenSpace(cameraInfo, &cameraSpacePos) * crossSize;
 
@@ -136,7 +141,11 @@ void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileLayer* lay
     struct MTMeshTile* tile = &layer->mesh.tiles[(row << layer->mesh.tileXBits) + minX];
     int startVertex = tile->startVertex;
 
-    for (int x = minX; x < maxX; ++x) {
+    for (int x = minX; x < maxX; ++x, ++tile) {
+        if (tile->indexCount == 0) {
+            continue;
+        }
+
         int startIndex = tile->startVertex - startVertex;
 
         if (tile->vertexCount + startIndex > MAX_VERTEX_CACHE_SIZE) {
@@ -165,12 +174,15 @@ void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileLayer* lay
         if (indices + 2 < indexEnd) {
             gSP1Triangle(renderState->dl++, indices[0] + startIndex, indices[1] + startIndex, indices[2] + startIndex, 0);
         }
-
-        ++tile;
     }
 
-    // retroactively update the vertex command
-    gSPVertex(vertexCopyCommand, &layer->mesh.vertices[startVertex], currentVertexCount, 0);
+    if (currentVertexCount) {
+        // retroactively update the vertex command
+        gSPVertex(vertexCopyCommand, &layer->mesh.vertices[startVertex], currentVertexCount, 0);
+    } else {
+        // if there are no vertices used then unallocate the gSPVertex command
+        renderState->dl = vertexCopyCommand;
+    }
 }
 
 void megatextureRenderLayer(struct MTTileCache* tileCache, struct MTTileLayer* layer, struct MTCullingLoop* currentLoop, float nearPlane, float farPlane, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState) {
