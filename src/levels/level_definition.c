@@ -1,15 +1,23 @@
 #include "./level_definition.h"
 
 void levelDefinitionFixTileIndexPointers(struct MTTileIndex* tileIndex, u32 pointerOffset, u32 imagePointerOffset) {
-    tileIndex->layers = ADJUST_POINTER_POS(tileIndex->layers, pointerOffset);
+    tileIndex->meshLayers = ADJUST_POINTER_POS(tileIndex->meshLayers, pointerOffset);
 
     for (int i = 0; i < tileIndex->layerCount; ++i) {
-        struct MTTileLayer* layer = &tileIndex->layers[i];
+        struct MTMeshLayer* layer = &tileIndex->meshLayers[i];
 
-        layer->mesh.vertices = ADJUST_POINTER_POS(layer->mesh.vertices, pointerOffset);
-        layer->mesh.indices = ADJUST_POINTER_POS(layer->mesh.indices, pointerOffset);
-        layer->mesh.tiles = ADJUST_POINTER_POS(layer->mesh.tiles, pointerOffset);
+        layer->vertices = ADJUST_POINTER_POS(layer->vertices, pointerOffset);
+        layer->indices = ADJUST_POINTER_POS(layer->indices, pointerOffset);
+        layer->tiles = ADJUST_POINTER_POS(layer->tiles, pointerOffset);
 
+    }
+
+
+    tileIndex->imageLayers = ADJUST_POINTER_POS(tileIndex->imageLayers, pointerOffset);
+
+    for (int i = 0; i < tileIndex->layerCount; ++i) {
+        struct MTImageLayer* layer = &tileIndex->imageLayers[i];
+        
         layer->tileSource = ADJUST_POINTER_POS(layer->tileSource, imagePointerOffset);
     }
 }

@@ -10,7 +10,7 @@
 #define MT_MAX_LOD              5
 #define MT_MIP_SAMPLE_COUNT     3
 #define MT_LOG_INV_2 1.442695041
-#define MT_LOD_BIAS             0.0
+#define MT_LOD_BIAS             0.5
 
 #define MT_CALCULATE_MIP_LEVEL(pixelArea) (logf(1.0f / (pixelArea)) * (0.5f * MT_LOG_INV_2) + MT_LOD_BIAS)
 
@@ -133,12 +133,13 @@ void megatextureDetermineMipLevels(struct MTUVBasis* uvBasis, float worldPixelWi
     }
 }
 
-void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileLayer* layer, int row, int minX, int maxX, struct RenderState* renderState) {
+void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileIndex* index, int layerIndex, int row, int minX, int maxX, struct RenderState* renderState) {
+    struct MTMeshLayer* meshLayer = &index->meshLayers[layerIndex];
     int currentVertexCount = 0;
 
     Gfx* vertexCopyCommand = renderState->dl++;
 
-    struct MTMeshTile* tile = &layer->mesh.tiles[(row << layer->mesh.tileXBits) + minX];
+    struct MTMeshTile* tile = &meshLayer->tiles[(row << meshLayer->tileXBits) + minX];
     int startVertex = tile->startVertex;
 
     for (int x = minX; x < maxX; ++x, ++tile) {
@@ -150,17 +151,17 @@ void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileLayer* lay
 
         if (tile->vertexCount + startIndex > MAX_VERTEX_CACHE_SIZE) {
             // retroactively update the vertex command
-            gSPVertex(vertexCopyCommand, &layer->mesh.vertices[startVertex], currentVertexCount, 0);
+            gSPVertex(vertexCopyCommand, &meshLayer->vertices[startVertex], currentVertexCount, 0);
             vertexCopyCommand = renderState->dl++;
             startIndex = 0;
         }
 
         currentVertexCount = startIndex + tile->vertexCount;
 
-        Gfx* tileRequest = mtTileCacheRequestTile(tileCache, &layer->tileSource[MT_TILE_WORDS * (x + row * layer->xTiles)], x, row, layer->lod);
+        Gfx* tileRequest = mtTileCacheRequestTile(tileCache, index, x, row, layerIndex);
         gSPDisplayList(renderState->dl++, tileRequest)
 
-        u8* indices = &layer->mesh.indices[tile->startIndex];
+        u8* indices = &meshLayer->indices[tile->startIndex];
         u8* indexEnd = indices + tile->indexCount;
 
         for (; indices + 5 < indexEnd; indices += 6) {
@@ -178,14 +179,14 @@ void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileLayer* lay
 
     if (currentVertexCount) {
         // retroactively update the vertex command
-        gSPVertex(vertexCopyCommand, &layer->mesh.vertices[startVertex], currentVertexCount, 0);
+        gSPVertex(vertexCopyCommand, &meshLayer->vertices[startVertex], currentVertexCount, 0);
     } else {
         // if there are no vertices used then unallocate the gSPVertex command
         renderState->dl = vertexCopyCommand;
     }
 }
 
-void megatextureRenderLayer(struct MTTileCache* tileCache, struct MTTileLayer* layer, struct MTCullingLoop* currentLoop, float nearPlane, float farPlane, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState) {
+void megatextureRenderLayer(struct MTTileCache* tileCache, struct MTTileIndex* index, int layerIndex, struct MTCullingLoop* currentLoop, float nearPlane, float farPlane, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState) {
     if (currentLoop->loopSize == 0) {
         // the plane is entirely outside the view
         return;
@@ -203,17 +204,18 @@ void megatextureRenderLayer(struct MTTileCache* tileCache, struct MTTileLayer* l
     float lastLeftBoundary = currentLoop->loop[leftIndex].x;
     float lastRightBoundary = lastLeftBoundary;
 
+    struct MTImageLayer* imageLayer = &index->imageLayers[layerIndex];
+    struct MTMeshLayer* meshLayer = &index->meshLayers[layerIndex];
+    float tileStep = 1.0f / imageLayer->yTiles;
+    float nextBoundary = tileStep * (meshLayer->minTileY + 1);
 
-    float tileStep = 1.0f / layer->yTiles;
-    float nextBoundary = tileStep * (layer->mesh.minTileY + 1);
-
-    if (layer->mesh.minTileY) {
+    if (meshLayer->minTileY) {
         // update indices and last boundaries
-        mtCullingLoopFindExtent(currentLoop, &leftIndex, &lastLeftBoundary, layer->mesh.minTileY * tileStep, 1);
-        mtCullingLoopFindExtent(currentLoop, &rightIndex, &lastRightBoundary, layer->mesh.minTileY * tileStep, -1);
+        mtCullingLoopFindExtent(currentLoop, &leftIndex, &lastLeftBoundary, meshLayer->minTileY * tileStep, 1);
+        mtCullingLoopFindExtent(currentLoop, &rightIndex, &lastRightBoundary, meshLayer->minTileY * tileStep, -1);
     }
 
-    for (int row = layer->mesh.minTileY; row < layer->mesh.maxTileY; ++row, nextBoundary += tileStep) {
+    for (int row = meshLayer->minTileY; row < meshLayer->maxTileY; ++row, nextBoundary += tileStep) {
         float minX = mtCullingLoopFindExtent(currentLoop, &leftIndex, &lastLeftBoundary, nextBoundary, 1);
         float maxX = mtCullingLoopFindExtent(currentLoop, &rightIndex, &lastRightBoundary, nextBoundary, -1);
 
@@ -230,10 +232,11 @@ void megatextureRenderLayer(struct MTTileCache* tileCache, struct MTTileLayer* l
 
         megatextureRenderRow(
             tileCache, 
-            layer, 
+            index,
+            layerIndex, 
             row, 
-            MAX(layer->mesh.minTileX, (int)floorf(minX * layer->xTiles)), 
-            MIN(layer->mesh.maxTileX, (int)ceilf(maxX * layer->xTiles)), 
+            MAX(meshLayer->minTileX, (int)floorf(minX * imageLayer->xTiles)), 
+            MIN(meshLayer->maxTileX, (int)ceilf(maxX * imageLayer->xTiles)), 
             renderState
         );
     }
@@ -281,10 +284,8 @@ void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index,
     float prevPlane = cameraInfo->nearPlane;
 
     for (int layerIndex = minLod; layerIndex <= maxLod; ++layerIndex) {
-        struct MTTileLayer* layer = &index->layers[layerIndex];
-
         if (layerIndex == maxLod) {
-            megatextureRenderLayer(tileCache, layer, &cullingLoop, prevPlane, cameraInfo->farPlane, cameraInfo, renderState);
+            megatextureRenderLayer(tileCache, index, layerIndex, &cullingLoop, prevPlane, cameraInfo->farPlane, cameraInfo, renderState);
             break;
         }
 
@@ -299,7 +300,7 @@ void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index,
 
         struct MTCullingLoop currentLoop;
         mtCullingLoopSplit(&cullingLoop, &clippingPlane, &currentLoop);
-        megatextureRenderLayer(tileCache, layer, &currentLoop, prevPlane, clippingPlaneDistance, cameraInfo, renderState);
+        megatextureRenderLayer(tileCache, index, layerIndex, &currentLoop, prevPlane, clippingPlaneDistance, cameraInfo, renderState);
 
         prevPlane = clippingPlaneDistance;
     }

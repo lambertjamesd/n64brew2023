@@ -184,7 +184,10 @@ void mtTileCacheFixDisplayList(struct MTTileCache* tileCache, int entryIndex, in
     osWritebackDCache(dl - 2, sizeof(Gfx) * 2);
 }
 
-Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, void* romAddress, int x, int y, int lod) {
+Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* index, int x, int y, int lod) {
+    struct MTImageLayer* imageLayer = &index->imageLayers[lod];
+    u64* romAddress = &imageLayer->tileSource[MT_TILE_WORDS * (x + y * imageLayer->xTiles)];
+
     int hashIndex = (LARGE_PRIME_NUMBER * (u32)romAddress) & tileCache->hashTableMask;
 
     int entryIndex = tileCache->hashTable[hashIndex];

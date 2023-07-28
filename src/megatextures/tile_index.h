@@ -24,17 +24,6 @@ struct MTMeshLayer {
     u8 tileXBits;
 };
 
-struct MTTileLayer {
-    u64* tileSource;
-    u8 xTiles;
-    u8 yTiles;
-    u8 lod;
-
-    struct MTMeshLayer mesh;
-
-    float worldPixelSize;
-};
-
 struct MTUVBasis {
     struct Vector3 uvOrigin;
     struct Vector3 uvRight;
@@ -42,8 +31,16 @@ struct MTUVBasis {
     struct Vector3 normal;
 };
 
+struct MTImageLayer {
+    u64* tileSource;
+    u8 xTiles;
+    u8 yTiles;
+    u8 isAlwaysLoaded;
+};
+
 struct MTTileIndex {
-    struct MTTileLayer* layers;
+    struct MTMeshLayer* meshLayers;
+    struct MTImageLayer* imageLayers;
     u8 layerCount;
     struct Box3D boundingBox;
     struct MTUVBasis uvBasis;

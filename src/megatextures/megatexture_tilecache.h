@@ -2,6 +2,7 @@
 #define __MEGATEXTURE_TILE_CACHE_H__
 
 #include <ultra64.h>
+#include "tile_index.h"
 
 #define MT_TILE_SIZE   (32 * 32 * 2)
 #define MT_TILE_WORDS  (MT_TILE_SIZE / sizeof(u64))
@@ -39,7 +40,7 @@ struct MTTileCache {
 };
 
 void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount);
-Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, void* romAddress, int x, int y, int lod);
+Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* index, int x, int y, int lod);
 void mtTileCacheWaitForTiles(struct MTTileCache* tileCache);
 
 #endif

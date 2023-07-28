@@ -669,22 +669,25 @@ end
 
 local function write_tile_index(world_mesh, megatexture_model)
     local layers = {}
+    local imageLayers = {}
 
-    for lod, layer in pairs(megatexture_model.layers) do
-        table.insert(layers, {
+    for _, layer in pairs(megatexture_model.layers) do
+        table.insert(layers, write_mesh_tiles(megatexture_model, layer))
+
+        table.insert(imageLayers, {
             tileSource = get_tiles_reference(layer),
             xTiles = layer.tile_count_x,
             yTiles = layer.tile_count_y,
-            lod = lod - 1,
-            mesh = write_mesh_tiles(megatexture_model, layer),
-            worldPixelSize = megatexture_model.uv_basis.right:magnitude() / layer.texture.width,
+            isAlwaysLoaded = layer.tile_count_x <= 2 and layer.tile_count_y <= 2,
         })
     end
 
-    sk_definition_writer.add_definition(world_mesh.name .. '_layers', 'struct MTTileLayer[]', '_geo', layers)
+    sk_definition_writer.add_definition(world_mesh.name .. '__mesh_layers', 'struct MTMeshLayer[]', '_geo', layers)
+    sk_definition_writer.add_definition(world_mesh.name .. '__image_layers', 'struct MTImageLayer[]', '_geo', imageLayers)
 
     return {
-        layers = sk_definition_writer.reference_to(layers, 1),
+        meshLayers = sk_definition_writer.reference_to(layers, 1),
+        imageLayers = sk_definition_writer.reference_to(imageLayers, 1),
         layerCount = #layers,
         boundingBox = world_mesh.bb,
         uvBasis = {
