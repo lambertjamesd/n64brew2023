@@ -574,6 +574,182 @@ local function calc_bits_needed(width)
     return bits
 end
 
+local function is_fill_loop(megatexture_model, loop)
+    local sum = sk_math.vector3(0, 0, 0)
+
+    for i = 3, #loop do
+        sum = sum + (loop[i - 1] - loop[0]):cross(loop[i] - loop[0])
+    end
+
+    return sum:dot(megatexture_model.normal) > 0
+end
+
+local function does_loop_contain_point(megatexture_model, loop, point)
+    local normal_clip = loop[2] - loop[1]
+    clip_plane_normal = normal_clip:normalized()
+    clip_plane_tangent = clip_plane_normal:cross(megatexture_model.normal)
+
+    local plane_normal = sk_math.plane3_with_point(clip_plane_normal, point)
+    local plane_tangent = sk_math.plane3_with_point(clip_plane_tangent, point)
+    local intersection_count = 0
+
+    for index, loop_point in ipairs(loop) do
+        local offset = loop_point - point
+        local next_offset = (index == #loop and loop[1] or loop[index + 1]) - point
+
+        local point_distance = plane_normal:distance_to_point(offset)
+        local next_distance = plane_normal:distance_to_point(next_offset)
+
+        if (point_distance >= 0 and next_distance < 0) or (point_distance <= 0 and next_distance > 0) then
+            local total_distance = point_distance - next_distance
+
+            local point_to_check = nil
+
+            if point_distance == 0 then
+                point_to_check = offset
+            elseif total_distance ~= 0 then
+                local lerp = point_distance / total_distance
+                point_to_check = offset:lerp(next_offset)
+            end
+
+            if point_to_check and clip_plane_tangent:distance_to_point(point_to_check) > 0 then
+                intersection_count = intersection_count + 1
+            end
+        end
+    end
+
+    return (intersection_count & 1) == 1
+end
+
+local function shallow_copy(t)
+    local t2 = {}
+    for k,v in pairs(t) do
+      t2[k] = v
+    end
+    return t2
+end
+
+local function find_next_hole_join_spot(vertices, loop_indices, holes)
+    local result = nil
+
+    for hole_loop_index, hole_loop in holes do
+        for loop_index_index, loop_index in ipairs(loop_indices) do
+            for hole_index_index, hole_index in ipairs(hole_loop.indices) do
+                local distance = (vertices[loop_index] - vertices[hole_index]):magnitudeSqrd()
+
+                if result == nil or distance < result.distance then
+                    result = {
+                        distance = distance,
+                        hole_loop_index = hole_loop_index,
+                        loop_index_index = loop_index_index,
+                        hole_index_index = hole_index_index,
+                    }
+                end
+            end
+        end
+    end
+
+    return result
+end
+
+local function join_loops(a, a_index, b, b_index)
+    local result = {}
+
+    for idx_a, value in ipairs(a) do
+        table.insert(value)
+
+        if idx_a == a_index then
+            for idx_b_no_wrap = b_index,b_index+#b do
+                if idx_b_no_wrap > #b then
+                    table.insert(b[idx_b_no_wrap - #b])
+                else
+                    table.insert(b[idx_b_no_wrap])
+                end
+            end
+
+            table.insert(b_index)
+            table.insert(a_index)
+        end
+    end
+
+    return result
+end
+
+local function fill_single_loop(vertices, loop)
+    return {}
+end
+
+local function fill_single_loop_with_holes(vertices, loop, hole_loops)
+    local loop_indices = shallow_copy(loop.indices)
+    hole_loops = shallow_copy(hole_loops)
+
+    while #hole_loops > 0 do
+        local next_join_spot = find_next_hole_join_spot(vertices, loop_indices, hole_loops)
+
+        if not next_join_spot then
+            hole_loops = {}
+        end
+
+        loop_indices = join_loops(
+            loop_indices, 
+            next_join_spot.loop_index_index, 
+            hole_loops[next_join_spot.hole_loop_index], 
+            next_join_spot.hole_index_index
+        )
+
+        table.remove(hole_loops, next_join_spot.hole_loop_index)
+    end
+
+    return fill_single_loop(vertices, loop_indices)
+end
+
+local function build_indices(start_index, count)
+    local result = {}
+    for i = 0, count-1 do
+        table.insert(result, i + start_index)
+    end
+    return result
+end
+
+local function fill_mesh(megatexture_model, loops)
+    local vertices = {}
+    local faces = {}
+
+    local fill_loops = {}
+    local all_hole_loops = {}
+
+    for _, loop in ipairs(loops) do
+        if is_fill_loop(megatexture_model, loop) then
+            table.insert(fill_loops, { loop = loop, indices = build_indices(#vertices + 1, #loop)})
+            table.insert(fill_loop_index_start, #vertices + 1)
+        else
+            table.insert(all_hole_loops, { loop = loop, indices = build_indices(#vertices + 1, #loop)})
+        end
+
+        for _, vertex in loop do
+            table.insert(vertices, vertex)
+        end
+    end
+
+    for fill_loop_index, fill_loop in fill_loops do
+        local hole_loops = {}
+
+        for _, loop in all_hole_loops do
+            if does_loop_contain_point(megatexture_model, fill_loop.loop, loop.loop) then
+                table.insert(hole_loops, loop)
+            end
+        end
+
+        local face_indices = fill_single_loop_with_holes(vertices, fill_loop, hole_loops)
+
+        for _, value in ipairs(face_indices) do
+            table.insert(faces, value)
+        end
+    end
+
+    return vertices, faces
+end
+
 local function write_mesh_tiles(megatexture_model, layer)
     local vertices = {}
     local indices = {}
