@@ -4,6 +4,8 @@
 
 #define LARGE_PRIME_NUMBER  1160939981
 
+#define MT_MAX_TILE_REQUESTS_PER_FRAME 32
+
 Gfx mtNopDisplayList[] = {gsSPEndDisplayList()};
 
 #define MT_IS_ENTRY_PRELOADED(entry)        ((entry)->newerTile == MT_NO_TILE_INDEX && (entry)->olderTile == MT_NO_TILE_INDEX)
@@ -66,6 +68,7 @@ void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount) {
     tileCache->nextOutboundMessage = 0;
     tileCache->oldestTileFromFrame[0] = MT_NO_TILE_INDEX;
     tileCache->oldestTileFromFrame[1] = MT_NO_TILE_INDEX;
+    tileCache->currentTilesThisFrame = 0;
 }
 
 int mtTileCacheRemoveOldestUsedTile(struct MTTileCache* tileCache) {
@@ -245,7 +248,11 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* i
         return result;
     }
 
-    int entryIndex = mtTileCacheRemoveOldestUsedTile(tileCache);
+    int entryIndex = MT_NO_TILE_INDEX;
+    
+    if (tileCache->currentTilesThisFrame < MT_MAX_TILE_REQUESTS_PER_FRAME) {
+        entryIndex = mtTileCacheRemoveOldestUsedTile(tileCache);
+    }
 
     if (entryIndex == MT_NO_TILE_INDEX) {
         // cant request any new tiles this frame
@@ -259,10 +266,6 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* i
 
             imageLayer = &index->imageLayers[lod];
 
-            if (!imageLayer->isAlwaysLoaded) {
-                continue;
-            }
-
             romAddress = MT_DETERMINE_ROM_ADDRESS(imageLayer, x, y);
             hashIndex = MT_HASH(tileCache, romAddress);
             result = mtTileCacheSearch(tileCache, romAddress, hashIndex);
@@ -274,6 +277,8 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* i
 
         return mtNopDisplayList;
     }
+
+    ++tileCache->currentTilesThisFrame;
 
     mtTileCacheAdd(tileCache, entryIndex, hashIndex);
 

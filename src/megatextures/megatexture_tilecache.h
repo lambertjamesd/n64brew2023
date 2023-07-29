@@ -41,6 +41,7 @@ struct MTTileCache {
     // index 0 is the current frame
     // index 1 is the previous frame
     u16 oldestTileFromFrame[2];
+    u16 currentTilesThisFrame;
 };
 
 void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount);

@@ -153,6 +153,7 @@ void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileIndex* ind
             // retroactively update the vertex command
             gSPVertex(vertexCopyCommand, &meshLayer->vertices[startVertex], currentVertexCount, 0);
             vertexCopyCommand = renderState->dl++;
+            startVertex = tile->startVertex;
             startIndex = 0;
         }
 
@@ -325,6 +326,7 @@ void megatexturePreload(struct MTTileCache* tileCache, struct MTTileIndex* index
 void megatextureRenderStart(struct MTTileCache* tileCache) {
     tileCache->oldestTileFromFrame[1] = tileCache->oldestTileFromFrame[0];
     tileCache->oldestTileFromFrame[0] = MT_NO_TILE_INDEX;
+    tileCache->currentTilesThisFrame = 0;
 }
 
 void megatextureRenderEnd(struct MTTileCache* tileCache) {

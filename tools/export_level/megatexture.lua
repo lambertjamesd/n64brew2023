@@ -828,14 +828,6 @@ local function write_mesh_tiles(megatexture_model, layer)
             local current_loop = current_mesh_data.vertices
             local current_loop_triangles = current_mesh_data.faces
 
-            -- todo combine holes
-            local current_loop = cell[1]
-            local next_loop = row[x + 1] and row[x + 1][1]
-
-            if not current_loop then
-                current_loop = {}
-            end
-
             if #current_loop > 0 then
                 min_tile_x = math.min(min_tile_x, x)
                 min_tile_y = math.min(min_tile_y, y)
