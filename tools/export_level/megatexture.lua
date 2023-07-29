@@ -578,7 +578,7 @@ local function is_fill_loop(megatexture_model, loop)
     local sum = sk_math.vector3(0, 0, 0)
 
     for i = 3, #loop do
-        sum = sum + (loop[i - 1] - loop[0]):cross(loop[i] - loop[0])
+        sum = sum + (loop[i - 1] - loop[1]):cross(loop[i] - loop[1])
     end
 
     return sum:dot(megatexture_model.normal) > 0
@@ -675,11 +675,67 @@ local function join_loops(a, a_index, b, b_index)
     return result
 end
 
-local function fill_single_loop(vertices, loop)
-    return {}
+local function loop_prev_index(loop, index)
+    if index == 1 then
+        return #loop
+    else
+        return index - 1
+    end
 end
 
-local function fill_single_loop_with_holes(vertices, loop, hole_loops)
+local function loop_next_index(loop, index)
+    if index == #loop then
+        return 1
+    else
+        return index + 1
+    end
+end
+
+local function can_cut_vertex_at_index(vertices, normal, loop, loop_index)
+    local next_index = loop_next_index(loop, loop_index)
+    local prev_index = loop_prev_index(loop, loop_index)
+
+    local next_point = vertices[loop[next_index]]
+    local curr_point = vertices[loop[loop_index]]
+    local prev_point = vertices[loop[prev_index]]
+
+    local edge = next_point - prev_point
+
+    if (curr_point - prev_point):cross(edge):dot(normal) <= 0 then
+        return false
+    end
+
+    return true
+end
+
+local function fill_single_loop(vertices, normal, loop)
+    local result = {}
+    local next_index = 1
+    local attempts = #loop
+
+    while #loop > 3 and attempts > 0 do
+        if can_cut_vertex_at_index(vertices, normal, loop, next_index) then
+            table.insert(result, {
+                loop[loop_prev_index(loop, next_index)],
+                loop[next_index],
+                loop[loop_next_index(loop, next_index)],
+            })
+
+            table.remove(loop, next_index)
+
+            attempts = #loop
+        else
+            next_index = loop_next_index(loop, next_index)
+            attempts = attempts - 1
+        end
+    end
+
+    table.insert(result, loop)
+
+    return result
+end
+
+local function fill_single_loop_with_holes(vertices, normal, loop, hole_loops)
     local loop_indices = shallow_copy(loop.indices)
     hole_loops = shallow_copy(hole_loops)
 
@@ -700,7 +756,7 @@ local function fill_single_loop_with_holes(vertices, loop, hole_loops)
         table.remove(hole_loops, next_join_spot.hole_loop_index)
     end
 
-    return fill_single_loop(vertices, loop_indices)
+    return fill_single_loop(vertices, normal, loop_indices)
 end
 
 local function build_indices(start_index, count)
@@ -721,33 +777,32 @@ local function fill_mesh(megatexture_model, loops)
     for _, loop in ipairs(loops) do
         if is_fill_loop(megatexture_model, loop) then
             table.insert(fill_loops, { loop = loop, indices = build_indices(#vertices + 1, #loop)})
-            table.insert(fill_loop_index_start, #vertices + 1)
         else
             table.insert(all_hole_loops, { loop = loop, indices = build_indices(#vertices + 1, #loop)})
         end
 
-        for _, vertex in loop do
+        for _, vertex in ipairs(loop) do
             table.insert(vertices, vertex)
         end
     end
 
-    for fill_loop_index, fill_loop in fill_loops do
+    for fill_loop_index, fill_loop in ipairs(fill_loops) do
         local hole_loops = {}
 
-        for _, loop in all_hole_loops do
+        for _, loop in ipairs(all_hole_loops) do
             if does_loop_contain_point(megatexture_model, fill_loop.loop, loop.loop) then
                 table.insert(hole_loops, loop)
             end
         end
 
-        local face_indices = fill_single_loop_with_holes(vertices, fill_loop, hole_loops)
+        local face_indices = fill_single_loop_with_holes(vertices, megatexture_model.normal, fill_loop, hole_loops)
 
         for _, value in ipairs(face_indices) do
             table.insert(faces, value)
         end
     end
 
-    return vertices, faces
+    return { vertices = vertices, faces = faces }
 end
 
 local function write_mesh_tiles(megatexture_model, layer)
@@ -762,9 +817,17 @@ local function write_mesh_tiles(megatexture_model, layer)
     max_tile_y = 0
 
     for y, row in ipairs(layer.mesh_tiles) do
-        local previous_loop = nil
+        local current_mesh_data = nil
+        local next_mesh_data = row[1] and fill_mesh(megatexture_model, row[1])
 
         for x, cell in ipairs(row) do
+            local previous_loop = current_mesh_data and current_mesh_data.vertices
+            current_mesh_data = next_mesh_data
+            next_mesh_data = row[x + 1] and fill_mesh(megatexture_model, row[x + 1])
+
+            local current_loop = current_mesh_data.vertices
+            local current_loop_triangles = current_mesh_data.faces
+
             -- todo combine holes
             local current_loop = cell[1]
             local next_loop = row[x + 1] and row[x + 1][1]
@@ -781,9 +844,8 @@ local function write_mesh_tiles(megatexture_model, layer)
                 max_tile_y = math.max(max_tile_y, y)
             end
 
+            local next_loop = next_mesh_data and next_mesh_data.vertices
             local vertex_mapping = determine_vertex_mapping(previous_loop, current_loop, next_loop)
-
-            previous_loop = current_loop
 
             local beginning_vertex = #vertices + 1 - vertex_mapping.beginning_overlap
             local beginning_index_length = #indices
@@ -794,11 +856,10 @@ local function write_mesh_tiles(megatexture_model, layer)
                 end
             end
 
-            -- TODO proper polygon fill instead of triangle fan
-            for i = 3, #current_loop do
-                table.insert(indices, vertex_mapping.old_to_new_index[1] - 1)
-                table.insert(indices, vertex_mapping.old_to_new_index[i - 1] - 1)
-                table.insert(indices, vertex_mapping.old_to_new_index[i] - 1)
+            for _, triangle in ipairs(current_loop_triangles) do
+                table.insert(indices, vertex_mapping.old_to_new_index[triangle[1]] - 1)
+                table.insert(indices, vertex_mapping.old_to_new_index[triangle[2]] - 1)
+                table.insert(indices, vertex_mapping.old_to_new_index[triangle[3]] - 1)
             end
 
             table.insert(tiles, {
@@ -881,6 +942,7 @@ local megatexture_indexes = {}
 for _, node in pairs(sk_scene.nodes_for_type('@megatexture')) do
     if #node.node.meshes > 0 then
         local world_mesh = node.node.meshes[1]:transform(node.node.full_transformation)
+        print('processing ' .. world_mesh.name)
         local megatexture_model = build_megatexture_model(world_mesh)
         local megatexture_index = write_tile_index(world_mesh, megatexture_model)
         table.insert(megatexture_indexes, megatexture_index) 
