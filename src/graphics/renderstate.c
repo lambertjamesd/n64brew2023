@@ -1,10 +1,9 @@
 #include "renderstate.h"
 
-void renderStateInit(struct RenderState* renderState, u16* framebuffer, u16* depthBuffer) {
+void renderStateInit(struct RenderState* renderState, u16* framebuffer) {
     renderState->dl = renderState->glist;
     renderState->currentMemoryChunk = &renderState->glist[MAX_DL_LENGTH + MAX_RENDER_STATE_MEMORY_CHUNKS];
     renderState->framebuffer = framebuffer;
-    renderState->depthBuffer = depthBuffer;
 }
 
 void* renderStateRequestMemory(struct RenderState* renderState, unsigned size) {

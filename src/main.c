@@ -177,6 +177,7 @@ static void gameProc(void* arg) {
     levelLoadDefinition(&gLevelList[0]);
     gSceneCallbacks->initCallback(gSceneCallbacks->data);
 
+
     while (1) {
         OSScMsg *msg = NULL;
         osRecvMesg(&gfxFrameMsgQ, (OSMesg*)&msg, OS_MESG_BLOCK);

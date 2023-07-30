@@ -30,8 +30,6 @@ u64 __attribute__((aligned(16))) dram_stack[SP_DRAM_STACK_SIZE64 + 1];
 u64 __attribute__((aligned(16))) gfxYieldBuf2[OS_YIELD_DATA_SIZE/sizeof(u64)];
 u32 firsttime = 1;
 
-u16 __attribute__((aligned(64))) zbuffer[SCREEN_HT * SCREEN_WD];
-
 u16* graphicsLayoutScreenBuffers(u16* memoryEnd) {
     gGraphicsTasks[0].framebuffer = memoryEnd - SCREEN_WD * SCREEN_HT;
     gGraphicsTasks[0].taskIndex = 0;
@@ -51,7 +49,7 @@ u16* graphicsLayoutScreenBuffers(u16* memoryEnd) {
 void graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callback, void* data) {
     struct RenderState *renderState = &targetTask->renderState;
 
-    renderStateInit(renderState, targetTask->framebuffer, zbuffer);
+    renderStateInit(renderState, targetTask->framebuffer);
     gSPSegment(renderState->dl++, 0, 0);
     gSPSegment(renderState->dl++, LEVEL_SEGMENT, gLevelSegment);
 
@@ -60,15 +58,7 @@ void graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callba
         gSPDisplayList(renderState->dl++, rdpstateinit_dl);
 	    firsttime = 0;
     }
-    gSPDisplayList(renderState->dl++, setup_rdpstate);
-
-    gDPSetDepthImage(renderState->dl++, osVirtualToPhysical(zbuffer));
-    gDPPipeSync(renderState->dl++);
-    gDPSetCycleType(renderState->dl++, G_CYC_FILL);
-    gDPSetColorImage(renderState->dl++, G_IM_FMT_RGBA, G_IM_SIZ_16b, SCREEN_WD, osVirtualToPhysical(zbuffer));
-    gDPSetFillColor(renderState->dl++, (GPACK_ZDZ(G_MAXFBZ,0) << 16 | GPACK_ZDZ(G_MAXFBZ,0)));
-    gDPFillRectangle(renderState->dl++, 0, 0, SCREEN_WD-1, SCREEN_HT-1);
-	
+    gSPDisplayList(renderState->dl++, setup_rdpstate);	
     
     gDPPipeSync(renderState->dl++);
     gDPSetColorImage(renderState->dl++, G_IM_FMT_RGBA, G_IM_SIZ_16b, SCREEN_WD, osVirtualToPhysical(targetTask->framebuffer));
