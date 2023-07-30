@@ -453,13 +453,22 @@ local function get_tiles_reference(tile_layer)
 
     local image_data = {}
 
+    local data_index = 0
+
     for _, row in pairs(tile_layer.texture_tiles) do
         for _, tile in pairs(row) do
             local tile_data = tile:get_data()
 
             for _, element in pairs(tile_data) do
                 table.insert(image_data, element)
+                data_index = data_index + 1
+
+                if data_index % 8 == 0 then
+                    table.insert(image_data, sk_definition_writer.newline)
+                end
             end
+
+            table.insert(image_data, sk_definition_writer.newline)
         end
     end
 
@@ -850,6 +859,8 @@ end
 local function write_mesh_tiles(megatexture_model, layer)
     local vertices = {}
     local indices = {}
+    local index_count = 0
+    local last_indices = nil
     local tiles = {}
 
     min_tile_x = layer.tile_count_x
@@ -882,7 +893,6 @@ local function write_mesh_tiles(megatexture_model, layer)
             local vertex_mapping = determine_vertex_mapping(previous_loop, current_loop, next_loop)
 
             local beginning_vertex = #vertices + 1 - vertex_mapping.beginning_overlap
-            local beginning_index_length = #indices
 
             for new, old in ipairs(vertex_mapping.new_to_old_index) do
                 if new > vertex_mapping.beginning_overlap then
@@ -890,19 +900,53 @@ local function write_mesh_tiles(megatexture_model, layer)
                 end
             end
 
+            local current_indices = {}
+
             for _, triangle in ipairs(current_loop_triangles) do
-                table.insert(indices, vertex_mapping.old_to_new_index[triangle[1]] - 1)
-                table.insert(indices, vertex_mapping.old_to_new_index[triangle[2]] - 1)
-                table.insert(indices, vertex_mapping.old_to_new_index[triangle[3]] - 1)
+                table.insert(current_indices, vertex_mapping.old_to_new_index[triangle[1]] - 1)
+                table.insert(current_indices, vertex_mapping.old_to_new_index[triangle[2]] - 1)
+                table.insert(current_indices, vertex_mapping.old_to_new_index[triangle[3]] - 1)
             end
+
+            local reuse_last = false
+
+            if last_indices and #current_indices == #last_indices then
+                reuse_last = true
+
+                for index, current in ipairs(current_indices) do
+                    if current ~= last_indices[index] then
+                        reuse_last = false
+                        break
+                    end
+                end
+            end
+
+            if reuse_last then
+                if #current_indices > 0 then
+                    table.insert(indices, sk_definition_writer.comment(table.concat(current_indices, ', ') .. ' reused from last'))
+                    table.insert(indices, sk_definition_writer.newline)
+                end
+            else
+                last_indices = current_indices
+
+                for _, current in ipairs(last_indices) do
+                    table.insert(indices, current)
+                end
+
+                index_count = index_count + #current_indices
+                table.insert(indices, sk_definition_writer.newline)
+            end
+
 
             table.insert(tiles, {
                 startVertex = beginning_vertex - 1,
-                startIndex = beginning_index_length,
-                indexCount = #indices - beginning_index_length,
+                startIndex = index_count - #current_indices,
+                indexCount = #current_indices,
                 vertexCount = #current_loop,
             })
         end
+
+        table.insert(indices, sk_definition_writer.newline)
     end
 
     local tiles_x_bits = calc_bits_needed(max_tile_x + 1 - min_tile_x)
