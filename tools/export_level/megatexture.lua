@@ -198,7 +198,7 @@ local function build_loop_from_split(current_loop_index, current_vertex_index, s
     while not used_vertices[current] do
         used_vertices[current] = true
         table.insert(result, current)
-
+        
         local next_on_split = next_edge_point[current]
 
         if next_on_split then
@@ -242,8 +242,9 @@ local function split_mesh_outline(edge_loops, normal, plane)
     local next_edge_point = {}
     local prev_edge_point = {}
 
-    for index, edge_point in pairs(edge_points) do
-        local next = index < #edge_points and edge_points[index + 1] or nil
+    for index = 1,#edge_points,2 do
+        local edge_point = edge_points[index]
+        local next = edge_points[index + 1]
 
         if next then
             next_edge_point[edge_point.vertex] = {loop_index = next.loop_index, index = next.indices[1]}
@@ -594,11 +595,10 @@ local function does_loop_contain_point(megatexture_model, loop, point)
     local intersection_count = 0
 
     for index, loop_point in ipairs(loop) do
-        local offset = loop_point - point
-        local next_offset = (index == #loop and loop[1] or loop[index + 1]) - point
+        local next_loop_point = index == #loop and loop[1] or loop[index + 1]
 
-        local point_distance = plane_normal:distance_to_point(offset)
-        local next_distance = plane_normal:distance_to_point(next_offset)
+        local point_distance = plane_normal:distance_to_point(loop_point)
+        local next_distance = plane_normal:distance_to_point(next_loop_point)
 
         if (point_distance >= 0 and next_distance < 0) or (point_distance <= 0 and next_distance > 0) then
             local total_distance = point_distance - next_distance
@@ -606,13 +606,13 @@ local function does_loop_contain_point(megatexture_model, loop, point)
             local point_to_check = nil
 
             if point_distance == 0 then
-                point_to_check = offset
+                point_to_check = loop_point
             elseif total_distance ~= 0 then
                 local lerp = point_distance / total_distance
-                point_to_check = offset:lerp(next_offset)
+                point_to_check = loop_point:lerp(next_loop_point, lerp)
             end
 
-            if point_to_check and clip_plane_tangent:distance_to_point(point_to_check) > 0 then
+            if point_to_check and plane_tangent:distance_to_point(point_to_check) > 0 then
                 intersection_count = intersection_count + 1
             end
         end
@@ -632,7 +632,7 @@ end
 local function find_next_hole_join_spot(vertices, loop_indices, holes)
     local result = nil
 
-    for hole_loop_index, hole_loop in holes do
+    for hole_loop_index, hole_loop in ipairs(holes) do
         for loop_index_index, loop_index in ipairs(loop_indices) do
             for hole_index_index, hole_index in ipairs(hole_loop.indices) do
                 local distance = (vertices[loop_index] - vertices[hole_index]):magnitudeSqrd()
@@ -656,19 +656,18 @@ local function join_loops(a, a_index, b, b_index)
     local result = {}
 
     for idx_a, value in ipairs(a) do
-        table.insert(value)
+        table.insert(result, value)
 
         if idx_a == a_index then
             for idx_b_no_wrap = b_index,b_index+#b do
                 if idx_b_no_wrap > #b then
-                    table.insert(b[idx_b_no_wrap - #b])
+                    table.insert(result, b[idx_b_no_wrap - #b])
                 else
-                    table.insert(b[idx_b_no_wrap])
+                    table.insert(result, b[idx_b_no_wrap])
                 end
             end
 
-            table.insert(b_index)
-            table.insert(a_index)
+            table.insert(result, value)
         end
     end
 
@@ -691,19 +690,45 @@ local function loop_next_index(loop, index)
     end
 end
 
-local function can_cut_vertex_at_index(vertices, normal, loop, loop_index)
-    local next_index = loop_next_index(loop, loop_index)
-    local prev_index = loop_prev_index(loop, loop_index)
+local function is_point_contained(triangle_vertices, point)
+    return (triangle_vertices[1] - point):cross(triangle_vertices[2] - triangle_vertices[1]).z > 0 and
+        (triangle_vertices[2] - point):cross(triangle_vertices[3] - triangle_vertices[2]).z > 0 and
+        (triangle_vertices[3] - point):cross(triangle_vertices[1] - triangle_vertices[3]).z > 0
+end
 
-    local next_point = vertices[loop[next_index]]
-    local curr_point = vertices[loop[loop_index]]
-    local prev_point = vertices[loop[prev_index]]
+local function do_points_cross_plane(plane_tangent, plane_origin, a, b)
+    local point_distance = (a - plane_origin):cross(plane_tangent).z
+    local next_distance = (b - plane_origin):cross(plane_tangent).z
 
-    local edge = next_point - prev_point
+    return point_distance * next_distance <= 0
+end
 
-    if (curr_point - prev_point):cross(edge):dot(normal) <= 0 then
+local function can_cut_vertex_at_index(vertices, loop, loop_index)
+    local next_loop_index = loop_next_index(loop, loop_index)
+    local prev_loop_index = loop_prev_index(loop, loop_index)
+
+    local next_loop_point = vertices[loop[next_loop_index]]
+    local loop_point = vertices[loop[loop_index]]
+    local prev_loop_point = vertices[loop[prev_loop_index]]
+
+    local triangle_vertices = {loop_point, next_loop_point, prev_loop_point}
+
+    local edge = next_loop_point - prev_loop_point
+
+    if (loop_point - prev_loop_point):cross(edge).z <= 0 then
+        -- triangle winding is the wrong way
         return false
     end
+
+    local current_index = loop_next_index(loop, next_loop_index)
+    
+    while current_index ~= prev_loop_index do
+        if is_point_contained(triangle_vertices, vertices[loop[current_index]]) then
+            return false
+        end
+
+        current_index = loop_next_index(loop, current_index)
+    end 
 
     return true
 end
@@ -713,8 +738,21 @@ local function fill_single_loop(vertices, normal, loop)
     local next_index = 1
     local attempts = #loop
 
+    local tangent = (vertices[2] - vertices[1]):normalized()
+    local cotangent = normal:cross(tangent):normalized()
+
+    local vertices_2d = {}
+
+    for _, vertex in ipairs(vertices) do
+        table.insert(vertices_2d, sk_math.vector3(
+            tangent:dot(vertex),
+            cotangent:dot(vertex),
+            0
+        ))
+    end
+
     while #loop > 3 and attempts > 0 do
-        if can_cut_vertex_at_index(vertices, normal, loop, next_index) then
+        if can_cut_vertex_at_index(vertices_2d, loop, next_index) then
             table.insert(result, {
                 loop[loop_prev_index(loop, next_index)],
                 loop[next_index],
@@ -722,6 +760,10 @@ local function fill_single_loop(vertices, normal, loop)
             })
 
             table.remove(loop, next_index)
+
+            if next_index > #loop then
+                next_index = 1
+            end
 
             attempts = #loop
         else
@@ -749,7 +791,7 @@ local function fill_single_loop_with_holes(vertices, normal, loop, hole_loops)
         loop_indices = join_loops(
             loop_indices, 
             next_join_spot.loop_index_index, 
-            hole_loops[next_join_spot.hole_loop_index], 
+            hole_loops[next_join_spot.hole_loop_index].indices, 
             next_join_spot.hole_index_index
         )
 
@@ -790,7 +832,7 @@ local function fill_mesh(megatexture_model, loops)
         local hole_loops = {}
 
         for _, loop in ipairs(all_hole_loops) do
-            if does_loop_contain_point(megatexture_model, fill_loop.loop, loop.loop) then
+            if does_loop_contain_point(megatexture_model, fill_loop.loop, loop.loop[1]) then
                 table.insert(hole_loops, loop)
             end
         end
