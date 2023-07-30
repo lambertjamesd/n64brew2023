@@ -860,7 +860,7 @@ local function write_mesh_tiles(megatexture_model, layer)
     local vertices = {}
     local indices = {}
     local index_count = 0
-    local last_indices = nil
+    local previous_indices = {}
     local tiles = {}
 
     min_tile_x = layer.tile_count_x
@@ -908,28 +908,23 @@ local function write_mesh_tiles(megatexture_model, layer)
                 table.insert(current_indices, vertex_mapping.old_to_new_index[triangle[3]] - 1)
             end
 
-            local reuse_last = false
+            local indices_as_string = table.concat(current_indices, ', ')
 
-            if last_indices and #current_indices == #last_indices then
-                reuse_last = true
+            local index_information = previous_indices[indices_as_string]
 
-                for index, current in ipairs(current_indices) do
-                    if current ~= last_indices[index] then
-                        reuse_last = false
-                        break
-                    end
-                end
-            end
-
-            if reuse_last then
+            if index_information then
                 if #current_indices > 0 then
-                    table.insert(indices, sk_definition_writer.comment(table.concat(current_indices, ', ') .. ' reused from last'))
+                    table.insert(indices, sk_definition_writer.comment(table.concat(current_indices, ', ') .. ' reused from previous entry'))
                     table.insert(indices, sk_definition_writer.newline)
                 end
             else
-                last_indices = current_indices
+                index_information = {
+                    start_index = index_count,
+                    index_count = #current_indices,
+                }
+                previous_indices[indices_as_string] = index_information
 
-                for _, current in ipairs(last_indices) do
+                for _, current in ipairs(current_indices) do
                     table.insert(indices, current)
                 end
 
@@ -937,11 +932,10 @@ local function write_mesh_tiles(megatexture_model, layer)
                 table.insert(indices, sk_definition_writer.newline)
             end
 
-
             table.insert(tiles, {
                 startVertex = beginning_vertex - 1,
-                startIndex = index_count - #current_indices,
-                indexCount = #current_indices,
+                startIndex = index_information.start_index,
+                indexCount = index_information.index_count,
                 vertexCount = #current_loop,
             })
         end
