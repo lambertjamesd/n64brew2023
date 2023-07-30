@@ -16,3 +16,9 @@ materials:
       filename: ./megatextures/Ice_Creeam.png
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b
+
+  l_wall:
+    gDPSetTile:
+      filename: ./megatextures/l_wall.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b

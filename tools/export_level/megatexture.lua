@@ -282,14 +282,36 @@ local function split_mesh_outline(edge_loops, normal, plane)
     return result_behind, result_infront
 end
 
+local function reduce(arr, reducer, initial)
+    local result = initial
+
+    for idx, value in pairs(arr) do
+        result = reducer(result, value, idx)
+    end
+
+    return result
+end
+
+local function find_idx_in_dir(arr, dir)
+    return reduce(arr, function (prev_idx, curr, curr_idx)
+        if arr[prev_idx]:dot(dir) > curr:dot(dir) then
+            return prev_idx
+        else
+            return curr_idx
+        end
+    end, 1)
+end
+
 local function determine_uv_pos(model, uv_pos)
+    local o_idx = find_idx_in_dir(model.uv, sk_math.vector3(-1, -1, 0))
+    local r_idx = find_idx_in_dir(model.uv, sk_math.vector3(1, -1, 0))
+    local u_idx = find_idx_in_dir(model.uv, sk_math.vector3(-1, 1, 0))
 
-    local a = model.uv[2] - model.uv[1]
-    local b = model.uv[3] - model.uv[1]
 
-    a_dir = a:normalized()
+    local a = (model.uv[r_idx] - model.uv[o_idx]):normalized()
+    local b = model.uv[u_idx] - model.uv[o_idx]
 
-    b = b - a_dir * a_dir:dot(b)
+    b = b - a * a:dot(b)
     local b_scale = a:magnitude() / b:magnitude()
     b = b * b_scale
 
@@ -305,13 +327,17 @@ local function determine_uv_pos(model, uv_pos)
     local x = determinant * (uv_offset.x * b.y - uv_offset.y * b.x)
     local y = determinant * (uv_offset.y * a.x - uv_offset.x * a.y)
 
-    local edge_a = model.vertices[2] - model.vertices[1]
-    local edge_b = model.vertices[3] - model.vertices[1]
+    local edge_a = model.vertices[r_idx] - model.vertices[o_idx]
+    local edge_b = model.vertices[u_idx] - model.vertices[o_idx]
 
     edge_a_dir = edge_a:normalized()
 
     edge_b = edge_b - edge_a_dir * edge_a_dir:dot(edge_b)
     edge_b = edge_b * b_scale
+
+    if (model.name == 'l_wall') then
+        debug_print(x, y)
+    end
 
     return model.vertices[1] + edge_a * x + edge_b * y
 end
@@ -325,6 +351,11 @@ local function determine_uv_basis(model)
     local origin = determine_uv_pos(model, sk_math.vector3(0, 1, 0))
     local right = determine_uv_pos(model, sk_math.vector3(1, 1, 0))
     local up = determine_uv_pos(model, sk_math.vector3(0, 0, 0))
+
+    if (model.name == 'l_wall') then
+        debug_print('origin', 'right', 'up')
+        debug_print(origin, right, up)
+    end
 
     return {origin = origin, right = right - origin, up = up - origin}
 end
@@ -1005,7 +1036,10 @@ local function write_tile_index(world_mesh, megatexture_model)
             uvUp = megatexture_model.uv_basis.up,
             normal = world_mesh.normals[1],
         },
-        worldPixelSize = megatexture_model.uv_basis.right:magnitude() / megatexture_model.texture.width,
+        worldPixelSize = math.sqrt(
+            (megatexture_model.uv_basis.right:magnitude() / megatexture_model.texture.width) *
+            (megatexture_model.uv_basis.up:magnitude() / megatexture_model.texture.height)
+        ),
     }
 end
 
