@@ -2,6 +2,7 @@ local sk_definition_writer = require('sk_definition_writer')
 local sk_scene = require('sk_scene')
 local sk_math = require('sk_math')
 local sk_input = require('sk_input')
+local sk_transform = require('sk_transform')
 
 local function debug_print_recursive(any, line_prefix, already_visited)
     if type(any) == 'table' then
@@ -302,62 +303,37 @@ local function find_idx_in_dir(arr, dir)
     end, 1)
 end
 
-local function determine_uv_pos(model, uv_pos)
-    local o_idx = find_idx_in_dir(model.uv, sk_math.vector3(-1, -1, 0))
-    local r_idx = find_idx_in_dir(model.uv, sk_math.vector3(1, -1, 0))
-    local u_idx = find_idx_in_dir(model.uv, sk_math.vector3(-1, 1, 0))
-
-
-    local a = (model.uv[r_idx] - model.uv[o_idx]):normalized()
-    local b = model.uv[u_idx] - model.uv[o_idx]
-
-    b = b - a * a:dot(b)
-    local b_scale = a:magnitude() / b:magnitude()
-    b = b * b_scale
-
-    -- | ox | = | ax bx |   | x |    | u |
-    -- | oy |   | ay by | * | y | +  | v |
-
-    --               | by -bx |   | ox - u |   | x |
-    -- ax*by - ay*bx | -ay ax | * | oy - v | = | y |
-
-    local determinant = a.x * b.y - a.y * b.x
-    local uv_offset = uv_pos - model.uv[1]
-
-    local x = determinant * (uv_offset.x * b.y - uv_offset.y * b.x)
-    local y = determinant * (uv_offset.y * a.x - uv_offset.x * a.y)
-
-    local edge_a = model.vertices[r_idx] - model.vertices[o_idx]
-    local edge_b = model.vertices[u_idx] - model.vertices[o_idx]
-
-    edge_a_dir = edge_a:normalized()
-
-    edge_b = edge_b - edge_a_dir * edge_a_dir:dot(edge_b)
-    edge_b = edge_b * b_scale
-
-    if (model.name == 'l_wall') then
-        debug_print(x, y)
-    end
-
-    return model.vertices[1] + edge_a * x + edge_b * y
-end
-
 local function determine_uv_basis(model)
     if not model.uv then
         error('Model does not have texture cooridnates')
     end
 
+    local o_idx = find_idx_in_dir(model.uv, sk_math.vector3(-1, -1, 0))
+    local r_idx = find_idx_in_dir(model.uv, sk_math.vector3(1, -1, 0))
+    local u_idx = find_idx_in_dir(model.uv, sk_math.vector3(-1, 1, 0))
+
     -- define the origin relative to the image origin (top left)
-    local origin = determine_uv_pos(model, sk_math.vector3(0, 1, 0))
-    local right = determine_uv_pos(model, sk_math.vector3(1, 1, 0))
-    local up = determine_uv_pos(model, sk_math.vector3(0, 0, 0))
+    texture_cooridate_mtx = sk_transform.from_array({
+        1,                      1,                     1,                     0,
+        model.uv[o_idx].x,      model.uv[r_idx].x,     model.uv[u_idx].x,     0, 
+        1 - model.uv[o_idx].y,  1 - model.uv[r_idx].y, 1 - model.uv[u_idx].y, 0, 
+        0,                      0,                     0,                     1,
+    })
 
-    if (model.name == 'l_wall') then
-        debug_print('origin', 'right', 'up')
-        debug_print(origin, right, up)
-    end
+    pos_matrix = sk_transform.from_array({
+        model.vertices[o_idx].x,  model.vertices[r_idx].x, model.vertices[u_idx].x, 0, 
+        model.vertices[o_idx].y,  model.vertices[r_idx].y, model.vertices[u_idx].y, 0, 
+        model.vertices[o_idx].z,  model.vertices[r_idx].z, model.vertices[u_idx].z, 0, 
+        0,                        0,                       0,                       1,
+    })
 
-    return {origin = origin, right = right - origin, up = up - origin}
+    uv_basis_mtx = pos_matrix * texture_cooridate_mtx:inverse()
+
+    local origin = sk_math.vector3(uv_basis_mtx[{1, 1}], uv_basis_mtx[{2, 1}], uv_basis_mtx[{3, 1}])
+    local right = sk_math.vector3(uv_basis_mtx[{1, 2}], uv_basis_mtx[{2, 2}], uv_basis_mtx[{3, 2}])
+    local up = sk_math.vector3(uv_basis_mtx[{1, 3}], uv_basis_mtx[{2, 3}], uv_basis_mtx[{3, 3}])
+
+    return {origin = origin, right = right, up = up}
 end
 
 local function build_tiles_at_lod(uv_basis, normal, edge_loops, texture, lod)
