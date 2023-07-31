@@ -17,6 +17,12 @@ materials:
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b
 
+  window_water_fight:
+    gDPSetTile:
+      filename: ./megatextures/Water_Fight.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
+
   l_wall:
     gDPSetTile:
       filename: ./megatextures/l_wall.png

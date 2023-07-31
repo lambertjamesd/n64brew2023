@@ -139,7 +139,7 @@ void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileIndex* ind
 
     Gfx* vertexCopyCommand = renderState->dl++;
 
-    struct MTMeshTile* tile = &meshLayer->tiles[(row << meshLayer->tileXBits) + minX];
+    struct MTMeshTile* tile = &meshLayer->tiles[((row - meshLayer->minTileY) << meshLayer->tileXBits) + (minX - meshLayer->minTileX)];
     int startVertex = tile->startVertex;
 
     for (int x = minX; x < maxX; ++x, ++tile) {
@@ -260,7 +260,7 @@ void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index,
 
     struct MTCullingLoop cullingLoop;
 
-    mtCullingLoopInit(&cullingLoop);
+    mtCullingLoopInit(&cullingLoop, &index->minUv, &index->maxUv);
     mtCullingLoopClip(&cullingLoop, &index->uvBasis, &cameraInfo->cullingInformation);
 
     if (cullingLoop.loopSize == 0) {

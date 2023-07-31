@@ -10,8 +10,16 @@ struct Vector2 gStartingLoop[] = {
     {1.0f, 0.0f},
 };
 
-void mtCullingLoopInit(struct MTCullingLoop* loop) {
+void mtCullingLoopInit(struct MTCullingLoop* loop, struct Vector2* min, struct Vector2* max) {
     memCopy(loop->loop, &gStartingLoop, sizeof(gStartingLoop));
+    loop->loop[0].x = min->x;
+    loop->loop[0].y = min->y;
+    loop->loop[1].x = min->x;
+    loop->loop[1].y = max->y;
+    loop->loop[2].x = max->x;
+    loop->loop[2].y = max->y;
+    loop->loop[3].x = max->x;
+    loop->loop[3].y = min->y;
     loop->loopSize = 4;
 }
 

@@ -2,6 +2,7 @@
 #define __MEGATEXTURE_TILE_INDEX_H__
 
 #include <ultra64.h>
+#include "../math/vector2.h"
 #include "../math/box3d.h"
 #include "../math/vector3.h"
 
@@ -44,6 +45,8 @@ struct MTTileIndex {
     u8 layerCount;
     struct Box3D boundingBox;
     struct MTUVBasis uvBasis;
+    struct Vector2 minUv;
+    struct Vector2 maxUv;
     float worldPixelSize;
 };
 

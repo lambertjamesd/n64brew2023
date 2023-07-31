@@ -961,7 +961,7 @@ local function write_mesh_tiles(megatexture_model, layer)
         x = (offset % layer.tile_count_x) + 1
         y = (offset // layer.tile_count_x) + 1
 
-        if x >= min_tile_x and x <= min_tile_x + tilex_x and y >= min_tile_y and y <= max_tile_y then
+        if x >= min_tile_x and x < min_tile_x + tilex_x and y >= min_tile_y and y <= max_tile_y then
             table.insert(filtered_tiles, tile)
         end
     end
@@ -1012,6 +1012,8 @@ local function write_tile_index(world_mesh, megatexture_model)
             uvUp = megatexture_model.uv_basis.up,
             normal = world_mesh.normals[1],
         },
+        minUv = {x = layers[1].minTileX / imageLayers[1].xTiles, y = layers[1].minTileY / imageLayers[1].yTiles},
+        maxUv = {x = layers[1].maxTileX / imageLayers[1].xTiles, y = layers[1].maxTileY / imageLayers[1].yTiles},
         worldPixelSize = math.sqrt(
             (megatexture_model.uv_basis.right:magnitude() / megatexture_model.texture.width) *
             (megatexture_model.uv_basis.up:magnitude() / megatexture_model.texture.height)

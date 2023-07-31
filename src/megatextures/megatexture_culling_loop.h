@@ -15,7 +15,7 @@ struct MTCullingLoop {
     u16 loopSize;
 };
 
-void mtCullingLoopInit(struct MTCullingLoop* loop);
+void mtCullingLoopInit(struct MTCullingLoop* loop, struct Vector2* min, struct Vector2* max);
 void mtCullingLoopClip(struct MTCullingLoop* loop, struct MTUVBasis* basis, struct FrustrumCullingInformation* frustrum);
 void mtCullingLoopSplit(struct MTCullingLoop* loop, struct Plane2* plane, struct MTCullingLoop* behindPlane);
 
