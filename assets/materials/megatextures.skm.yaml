@@ -1,31 +1,49 @@
 materials:
-  parrot_test:
+  window_right_0:
     gDPSetTile:
-      filename: ./megatextures/test.jpg
-      fmt: G_IM_FMT_RGBA
-      siz: G_IM_SIZ_16b
-      
-  window_mid:
-    gDPSetTile:
-      filename: ./megatextures/Mid_Campfire.png
+      filename: ./megatextures/window_right_0.png
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b
 
-  window_ice_cream:
+  window_right_1:
     gDPSetTile:
-      filename: ./megatextures/Ice_Creeam.png
+      filename: ./megatextures/window_right_1.png
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b
 
-  window_water_fight:
+  window_right_2:
     gDPSetTile:
-      filename: ./megatextures/Water_Fight.png
+      filename: ./megatextures/window_right_2.png
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b
 
-  l_wall:
+  wall_right:
     gDPSetTile:
-      filename: ./megatextures/l_wall.png
+      filename: ./megatextures/wall_right.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
+
+  window_left_0:
+    gDPSetTile:
+      filename: ./megatextures/window_left_0.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
+
+  window_left_1:
+    gDPSetTile:
+      filename: ./megatextures/window_left_1.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
+
+  window_left_2:
+    gDPSetTile:
+      filename: ./megatextures/window_left_2.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
+
+  wall_left:
+    gDPSetTile:
+      filename: ./megatextures/wall_left.png
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b
 
