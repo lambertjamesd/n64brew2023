@@ -10,7 +10,7 @@
 #define MT_MAX_LOD              5
 #define MT_MIP_SAMPLE_COUNT     3
 #define MT_LOG_INV_2 1.442695041
-#define MT_LOD_BIAS             0.5
+#define MT_LOD_BIAS             1.5
 
 #define MT_CALCULATE_MIP_LEVEL(pixelArea) (logf(1.0f / (pixelArea)) * (0.5f * MT_LOG_INV_2) + MT_LOD_BIAS)
 

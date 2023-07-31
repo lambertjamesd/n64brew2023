@@ -28,3 +28,9 @@ materials:
       filename: ./megatextures/l_wall.png
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b
+
+  ceiling:
+    gDPSetTile:
+      filename: ./megatextures/ceiling.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
