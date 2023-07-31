@@ -74,24 +74,27 @@ void playerGetMoveBasis(struct Transform* transform, struct Vector3* forward, st
     vector3Normalize(right, right);
 }
 
+#define MOVE_SPEED      3.0f
+#define ROTATE_SPEED    3.0f
+
 void sceneUpdate(struct Scene* scene) {
     float frontToBack = 0.0f;
     float sideToSide = 0.0f;
 
     if (controllerGetButton(0, U_CBUTTONS)) {
-        frontToBack -= 1.0f;
+        frontToBack -= MOVE_SPEED;
     }
 
     if (controllerGetButton(0, D_CBUTTONS)) {
-        frontToBack += 1.0f;
+        frontToBack += MOVE_SPEED;
     }
 
     if (controllerGetButton(0, R_CBUTTONS)) {
-        sideToSide += 1.0f;
+        sideToSide += MOVE_SPEED;
     }
 
     if (controllerGetButton(0, L_CBUTTONS)) {
-        sideToSide -= 1.0f;
+        sideToSide -= MOVE_SPEED;
     }
 
     struct Vector3 forward;
@@ -105,11 +108,11 @@ void sceneUpdate(struct Scene* scene) {
 
     // yaw
     struct Quaternion deltaRotate;
-    quatAxisAngle(&gUp, -pad->stick_x * FIXED_DELTA_TIME * (1.0f / 80.0f), &deltaRotate);
+    quatAxisAngle(&gUp, -pad->stick_x * ROTATE_SPEED * FIXED_DELTA_TIME * (1.0f / 80.0f), &deltaRotate);
     struct Quaternion tempRotation;
     quatMultiply(&deltaRotate, &scene->camera.transform.rotation, &tempRotation);
 
     // pitch
-    quatAxisAngle(&gRight, pad->stick_y * FIXED_DELTA_TIME * (1.0f / 80.0f), &deltaRotate);
+    quatAxisAngle(&gRight, pad->stick_y * ROTATE_SPEED * FIXED_DELTA_TIME * (1.0f / 80.0f), &deltaRotate);
     quatMultiply(&tempRotation, &deltaRotate, &scene->camera.transform.rotation);
 }

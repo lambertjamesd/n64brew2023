@@ -52,3 +52,21 @@ materials:
       filename: ./megatextures/ceiling.png
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b
+
+  window_main:
+    gDPSetTile:
+      filename: ./megatextures/window_main.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
+
+  wall_main:
+    gDPSetTile:
+      filename: ./megatextures/wall_main.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
+
+  floor_main:
+    gDPSetTile:
+      filename: ./megatextures/floor_main.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
