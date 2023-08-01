@@ -7,8 +7,8 @@
 #include "../scene/camera.h"
 
 void megatextureRenderStart(struct MTTileCache* tileCache);
-void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState);
+int megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState);
 void megatexturePreload(struct MTTileCache* tileCache, struct MTTileIndex* index);
-void megatextureRenderEnd(struct MTTileCache* tileCache);
+void megatextureRenderEnd(struct MTTileCache* tileCache, int success);
 
 #endif

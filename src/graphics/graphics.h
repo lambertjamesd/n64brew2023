@@ -29,9 +29,9 @@ extern void* gLevelSegment;
 
 #define GET_GFX_TYPE(gfx)       (_SHIFTR((gfx)->words.w0, 24, 8))
 
-typedef void (*GraphicsCallback)(void* data, struct RenderState* renderState, struct GraphicsTask* task);
+typedef int (*GraphicsCallback)(void* data, struct RenderState* renderState, struct GraphicsTask* task);
 
 u16* graphicsLayoutScreenBuffers(u16* memoryEnd);
-void graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callback, void* data);
+int graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callback, void* data);
 
 #endif

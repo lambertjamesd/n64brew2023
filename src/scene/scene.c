@@ -29,7 +29,7 @@ void sceneInit(struct Scene* scene) {
 
 extern Vp fullscreenViewport;
 
-void sceneRender(struct Scene* scene, struct RenderState* renderState, struct GraphicsTask* task) {
+int sceneRender(struct Scene* scene, struct RenderState* renderState, struct GraphicsTask* task) {
     megatextureRenderStart(&scene->tileCache);
 
     struct CameraMatrixInfo cameraInfo;
@@ -47,10 +47,14 @@ void sceneRender(struct Scene* scene, struct RenderState* renderState, struct Gr
     gDPSetTileSize(renderState->dl++, 0, 32 << 2, 32 << 2, (32 + 31) << 2, (32 + 31) << 2);
 
     for (int i = 0; i < gLoadedLevel->megatextureIndexcount; ++i) {
-        megatextureRender(&scene->tileCache, &gLoadedLevel->megatextureIndexes[i], &cameraInfo, renderState);
+        if (!megatextureRender(&scene->tileCache, &gLoadedLevel->megatextureIndexes[i], &cameraInfo, renderState)) {
+            megatextureRenderEnd(&scene->tileCache, 0);
+            return 0;
+        }
     }
 
-    megatextureRenderEnd(&scene->tileCache);
+    megatextureRenderEnd(&scene->tileCache, 1);
+    return 1;
 }
 
 void playerGetMoveBasis(struct Transform* transform, struct Vector3* forward, struct Vector3* right) {

@@ -46,7 +46,7 @@ u16* graphicsLayoutScreenBuffers(u16* memoryEnd) {
 
 #define CLEAR_COLOR GPACK_RGBA5551(0x32, 0x5D, 0x79, 1)
 
-void graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callback, void* data) {
+int graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callback, void* data) {
     struct RenderState *renderState = &targetTask->renderState;
 
     renderStateInit(renderState, targetTask->framebuffer);
@@ -67,7 +67,9 @@ void graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callba
     gDPSetCycleType(renderState->dl++, G_CYC_1CYCLE); 
 
     if (callback) {
-        callback(data, renderState, targetTask);
+        if (!callback(data, renderState, targetTask)) {
+            return 0;
+        }
     }
 
     gDPPipeSync(renderState->dl++);
@@ -121,4 +123,5 @@ void graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callba
 #endif // WITH_GFX_VALIDATOR
 
     osSendMesg(schedulerCommandQueue, (OSMesg)scTask, OS_MESG_BLOCK);
+    return 1;
 }

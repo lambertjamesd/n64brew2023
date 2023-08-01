@@ -192,9 +192,10 @@ static void gameProc(void* arg) {
                 }
 
                 if (pendingGFX < 2 && drawingEnabled) {
-                    graphicsCreateTask(&gGraphicsTasks[drawBufferIndex], gSceneCallbacks->graphicsCallback, gSceneCallbacks->data);
-                    drawBufferIndex = drawBufferIndex ^ 1;
-                    ++pendingGFX;
+                    if (graphicsCreateTask(&gGraphicsTasks[drawBufferIndex], gSceneCallbacks->graphicsCallback, gSceneCallbacks->data)) {
+                        drawBufferIndex = drawBufferIndex ^ 1;
+                        ++pendingGFX;
+                    }
                 }
 
                 controllersTriggerRead();

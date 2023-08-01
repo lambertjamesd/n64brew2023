@@ -15,6 +15,7 @@
 
 #define MT_LOD_BIAS_START       1.5f
 #define MT_LOD_BIAS_STEP        (1.0f / 32.0f)
+#define MT_LOD_BIAS_FAIL_STEP   (1.0f / 2.0f)
 #define MT_LOD_BIAS_MIN         1.0f
 
 float gMtLodBias = 1.5f;
@@ -204,10 +205,10 @@ void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileIndex* ind
     }
 }
 
-void megatextureRenderLayer(struct MTTileCache* tileCache, struct MTTileIndex* index, int layerIndex, struct MTCullingLoop* currentLoop, float nearPlane, float farPlane, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState) {
+int megatextureRenderLayer(struct MTTileCache* tileCache, struct MTTileIndex* index, int layerIndex, struct MTCullingLoop* currentLoop, float nearPlane, float farPlane, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState) {
     if (currentLoop->loopSize == 0) {
         // the plane is entirely outside the view
-        return;
+        return 1;
     }
 
     nearPlane *= SCENE_SCALE;
@@ -244,6 +245,11 @@ void megatextureRenderLayer(struct MTTileCache* tileCache, struct MTTileIndex* i
 
 
         Mtx* projection = renderStateRequestMatrices(renderState, 1);   
+
+        if (!projection) {
+            return 0;
+        }
+
         guMtxF2L(cameraInfo->projectionMatrix, projection);
         gSPMatrix(renderState->dl++, projection, G_MTX_LOAD | G_MTX_PROJECTION | G_MTX_NOPUSH);
         gSPMatrix(renderState->dl++, cameraInfo->viewMtx, G_MTX_MUL | G_MTX_PROJECTION | G_MTX_NOPUSH);
@@ -258,6 +264,8 @@ void megatextureRenderLayer(struct MTTileCache* tileCache, struct MTTileIndex* i
             renderState
         );
     }
+
+    return 1;
 }
 
 int mtIsBackFacing(struct CameraMatrixInfo* cameraInfo, struct MTUVBasis* basis) {
@@ -266,13 +274,13 @@ int mtIsBackFacing(struct CameraMatrixInfo* cameraInfo, struct MTUVBasis* basis)
     return vector3Dot(&offset, &basis->normal) >= 0.0f;
 }
 
-void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState) {
+int megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState) {
     if (mtIsBackFacing(cameraInfo, &index->uvBasis)) {
-        return;
+        return 1;
     }
 
     if (isOutsideFrustrum(&cameraInfo->cullingInformation, &index->boundingBox)) {
-        return;
+        return 1;
     }
 
     struct MTCullingLoop cullingLoop;
@@ -282,7 +290,7 @@ void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index,
 
     if (cullingLoop.loopSize == 0) {
         // the plane is entirely outside the view
-        return;
+        return 1;
     }
 
     float clipingPlaneDistances[MT_MAX_LOD];
@@ -303,8 +311,7 @@ void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index,
 
     for (int layerIndex = minLod; layerIndex <= maxLod; ++layerIndex) {
         if (layerIndex == maxLod) {
-            megatextureRenderLayer(tileCache, index, layerIndex, &cullingLoop, prevPlane, cameraInfo->farPlane, cameraInfo, renderState);
-            break;
+            return megatextureRenderLayer(tileCache, index, layerIndex, &cullingLoop, prevPlane, cameraInfo->farPlane, cameraInfo, renderState);
         }
 
         float clippingPlaneDistance = clipingPlaneDistances[layerIndex];
@@ -318,10 +325,14 @@ void megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index,
 
         struct MTCullingLoop currentLoop;
         mtCullingLoopSplit(&cullingLoop, &clippingPlane, &currentLoop);
-        megatextureRenderLayer(tileCache, index, layerIndex, &currentLoop, prevPlane, clippingPlaneDistance, cameraInfo, renderState);
+        if (!megatextureRenderLayer(tileCache, index, layerIndex, &currentLoop, prevPlane, clippingPlaneDistance, cameraInfo, renderState)) {
+            return 0;
+        }
 
         prevPlane = clippingPlaneDistance;
     }
+
+    return 1;
 }
 
 void megatexturePreload(struct MTTileCache* tileCache, struct MTTileIndex* index) {
@@ -347,8 +358,13 @@ void megatextureRenderStart(struct MTTileCache* tileCache) {
     tileCache->failedRequestsThisFrame = 0;
 }
 
-void megatextureRenderEnd(struct MTTileCache* tileCache) {
+void megatextureRenderEnd(struct MTTileCache* tileCache, int success) {
     mtTileCacheWaitForTiles(tileCache);
+
+    if (!success) {
+        gMtLodBias += MT_LOD_BIAS_FAIL_STEP;
+        return;
+    }
 
     if (tileCache->failedRequestsThisFrame) {
         gMtLodBias += MT_LOD_BIAS_STEP;
