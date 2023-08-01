@@ -12,7 +12,15 @@
 #define MT_LOG_INV_2 1.442695041
 #define MT_LOD_BIAS             1.5
 
-#define MT_CALCULATE_MIP_LEVEL(pixelArea) (logf(1.0f / (pixelArea)) * (0.5f * MT_LOG_INV_2) + MT_LOD_BIAS)
+#define MIN_PIXEL_AREA          0.000061035
+
+float mtCalculateMipLevel(float pixelArea) {
+    if (pixelArea < MIN_PIXEL_AREA) {
+        return 10.0f;
+    }
+
+    return logf(1.0f / (pixelArea)) * (0.5f * MT_LOG_INV_2) + MT_LOD_BIAS;
+}
 
 float mtScreenSpace(struct CameraMatrixInfo* cameraInfo, struct Vector2* cameraSpacePoint) {
     return (SCREEN_HT / 2.0f) * cameraInfo->cotFov * cameraSpacePoint->x / cameraSpacePoint->y;
@@ -40,7 +48,7 @@ void megatextureDetermineMipLevels(struct MTUVBasis* uvBasis, float worldPixelWi
         cameraSpacePos.y = vector3Dot(&cameraOffset, &cameraInfo->forwardVector);
         float sideSize = mtScreenSpace(cameraInfo, &cameraSpacePos);
         float pixelArea = sideSize * sideSize;
-        float mipLevel = MT_CALCULATE_MIP_LEVEL(pixelArea);
+        float mipLevel = mtCalculateMipLevel(pixelArea);
         // not needed but helpful for debugging
         mipPlanesOut[0] = cameraSpacePos.y;
 
@@ -97,7 +105,7 @@ void megatextureDetermineMipLevels(struct MTUVBasis* uvBasis, float worldPixelWi
         float pixelArea = mtScreenSpace(cameraInfo, &cameraSpacePos) * crossSize;
 
         distance[i] = cameraSpacePos.y;
-        mipLevel[i] = MT_CALCULATE_MIP_LEVEL(pixelArea);
+        mipLevel[i] = mtCalculateMipLevel(pixelArea);
 
         lerp += (1.0f / (MT_MIP_SAMPLE_COUNT - 1));
     }
@@ -139,7 +147,7 @@ void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileIndex* ind
 
     Gfx* vertexCopyCommand = renderState->dl++;
 
-    struct MTMeshTile* tile = &meshLayer->tiles[((row - meshLayer->minTileY) << meshLayer->tileXBits) + (minX - meshLayer->minTileX)];
+    struct MTMeshTile* tile = &meshLayer->tiles[((row - meshLayer->minTileY) * (meshLayer->maxTileX - meshLayer->minTileX)) + (minX - meshLayer->minTileX)];
     int startVertex = tile->startVertex;
 
     for (int x = minX; x < maxX; ++x, ++tile) {
@@ -150,6 +158,10 @@ void megatextureRenderRow(struct MTTileCache* tileCache, struct MTTileIndex* ind
         int startIndex = tile->startVertex - startVertex;
 
         if (tile->vertexCount + startIndex > MAX_VERTEX_CACHE_SIZE) {
+            if (currentVertexCount == 0) {
+                continue;
+            }
+
             // retroactively update the vertex command
             gSPVertex(vertexCopyCommand, &meshLayer->vertices[startVertex], currentVertexCount, 0);
             vertexCopyCommand = renderState->dl++;

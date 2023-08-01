@@ -53,6 +53,12 @@ materials:
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b
 
+  entry:
+    gDPSetTile:
+      filename: ./megatextures/entry.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
+
   window_main:
     gDPSetTile:
       filename: ./megatextures/window_main.png
@@ -65,8 +71,20 @@ materials:
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b
 
+  wall_back:
+    gDPSetTile:
+      filename: ./megatextures/wall_back.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
+
   floor_main:
     gDPSetTile:
       filename: ./megatextures/floor_main.png
+      fmt: G_IM_FMT_RGBA
+      siz: G_IM_SIZ_16b
+
+  floor_upper:
+    gDPSetTile:
+      filename: ./megatextures/floor_upper.png
       fmt: G_IM_FMT_RGBA
       siz: G_IM_SIZ_16b

@@ -36,9 +36,6 @@ void sceneRender(struct Scene* scene, struct RenderState* renderState, struct Gr
     cameraSetupMatrices(&scene->camera, renderState, (float)SCREEN_WD / SCREEN_HT, 1, &cameraInfo);
     cameraApplyMatrices(renderState, &cameraInfo);
 
-    gSPDisplayList(renderState->dl++, static_vertex_color);
-    gSPDisplayList(renderState->dl++, chapel_model_gfx);
-
     gSPDisplayList(renderState->dl++, static_tile_image);
     gDPSetTile(
         renderState->dl++, 

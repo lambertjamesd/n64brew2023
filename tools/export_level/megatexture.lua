@@ -4,6 +4,8 @@ local sk_math = require('sk_math')
 local sk_input = require('sk_input')
 local sk_transform = require('sk_transform')
 
+local lod_reduction = 0
+
 local function debug_print_recursive(any, line_prefix, already_visited)
     if type(any) == 'table' then
         local metatable = getmetatable(any)
@@ -419,11 +421,15 @@ local function build_megatexture_model(world_mesh)
     local texture = world_mesh.material.tiles[1].texture
 
     if not texture then
-        error('texture not set')
+        error('texture not set for material ' .. world_mesh.material.name)
     end 
 
     if not is_power_of_2(texture.width) or not is_power_of_2(texture.height) then
         error('texture size ' .. texture.width .. 'x' .. texture.height .. ' is not a power of 2')
+    end
+
+    for i = 1, lod_reduction do
+        texture = texture:resize(texture.width >> 1, texture.height >> 1)
     end
 
     local current_texture = texture
@@ -952,7 +958,7 @@ local function write_mesh_tiles(megatexture_model, layer)
 
     local tiles_x_bits = calc_bits_needed(max_tile_x + 1 - min_tile_x)
 
-    local tilex_x = 1 << tiles_x_bits;
+    local row_size = 1 << tiles_x_bits;
 
     local filtered_tiles = {}
 
@@ -961,7 +967,7 @@ local function write_mesh_tiles(megatexture_model, layer)
         x = (offset % layer.tile_count_x) + 1
         y = (offset // layer.tile_count_x) + 1
 
-        if x >= min_tile_x and x < min_tile_x + tilex_x and y >= min_tile_y and y <= max_tile_y then
+        if x >= min_tile_x and x <= max_tile_x and y >= min_tile_y and y <= max_tile_y then
             table.insert(filtered_tiles, tile)
         end
     end
@@ -979,7 +985,6 @@ local function write_mesh_tiles(megatexture_model, layer)
         minTileY = min_tile_y - 1,
         maxTileX = max_tile_x,
         maxTileY = max_tile_y,
-        tileXBits = tiles_x_bits,
     }
 end 
 
