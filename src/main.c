@@ -177,6 +177,7 @@ static void gameProc(void* arg) {
     levelLoadDefinition(&gLevelList[0]);
     gSceneCallbacks->initCallback(gSceneCallbacks->data);
 
+    calculateBytesFree();
 
     while (1) {
         OSScMsg *msg = NULL;

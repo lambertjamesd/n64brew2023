@@ -69,6 +69,7 @@ void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount) {
     tileCache->oldestTileFromFrame[0] = MT_NO_TILE_INDEX;
     tileCache->oldestTileFromFrame[1] = MT_NO_TILE_INDEX;
     tileCache->currentTilesThisFrame = 0;
+    tileCache->failedRequestsThisFrame = 0;
 }
 
 int mtTileCacheRemoveOldestUsedTile(struct MTTileCache* tileCache) {
@@ -255,6 +256,8 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* i
     }
 
     if (entryIndex == MT_NO_TILE_INDEX) {
+        ++tileCache->failedRequestsThisFrame;
+
         // cant request any new tiles this frame
         // resort to searching for any existing
         // loaded tile
