@@ -76,6 +76,10 @@ int graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callbac
     gDPFullSync(renderState->dl++);
     gSPEndDisplayList(renderState->dl++);
 
+    if (renderStateDidOverflow(renderState)) {
+        return 0;
+    }
+
     renderStateFlushCache(renderState);
 
     OSScTask *scTask = &targetTask->task;

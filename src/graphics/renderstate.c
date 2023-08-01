@@ -81,6 +81,11 @@ int renderStateMaxDLCount(struct RenderState* renderState) {
     return renderState->currentMemoryChunk - renderState->glist;
 }
 
+int renderStateDidOverflow(struct RenderState* renderState) {
+    // display list grows up, allocated memory grows down
+    return renderState->currentMemoryChunk < renderState->dl;
+}
+
 void renderStateInlineBranch(struct RenderState* renderState, Gfx* dl) {
     while (_SHIFTR(dl->words.w0, 24, 8) != G_ENDDL) {
         *renderState->dl++ = *dl++;

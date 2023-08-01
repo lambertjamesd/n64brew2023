@@ -28,6 +28,7 @@ Gfx* renderStateStartChunk(struct RenderState* renderState);
 Gfx* renderStateEndChunk(struct RenderState* renderState, Gfx* chunkStart);
 
 int renderStateMaxDLCount(struct RenderState* renderState);
+int renderStateDidOverflow(struct RenderState* renderState);
 
 void renderStateInlineBranch(struct RenderState* renderState, Gfx* dl);
 
