@@ -24,3 +24,5 @@ src/controls/controller-data.h
 
 # exclude images until the end of the jam
 assets/materials/megatextures
+
+world_high_res/
