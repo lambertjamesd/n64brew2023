@@ -2,12 +2,7 @@
 
 #include "graphics.h"
 
-Vp fullscreenViewport = {
-  .vp = {
-    .vscale = {SCREEN_WD*2, SCREEN_HT*2, G_MAXZ/4, 0},	/* scale */
-    .vtrans = {SCREEN_WD*2, SCREEN_HT*2, G_MAXZ/4, 0},	/* translate */
-  }
-};
+Vp fullscreenViewport;
 
 /*
  * This display list initializes the RDP the first time. After this, only
@@ -64,7 +59,6 @@ Gfx rdpstateinit_dl[] = {
 
 Gfx setup_rdpstate[] = {
     gsDPSetRenderMode(G_RM_OPA_SURF, G_RM_OPA_SURF2),
-    gsDPSetScissor(G_SC_NON_INTERLACE, 0, 0, SCREEN_WD, SCREEN_HT),
     gsDPSetColorDither(G_CD_BAYER),
     gsDPSetTexturePersp(G_TP_PERSP),
 

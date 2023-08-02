@@ -8,8 +8,7 @@
 #include "../controls/controller.h"
 
 #include "../util/time.h"
-
-#define TILE_CACHE_ENTRY_COUNT  512
+#include "game_settings.h"
 
 void sceneInit(struct Scene* scene) {
     cameraInit(&scene->camera, 70.0f, 0.125f * SCENE_SCALE, 20.0f * SCENE_SCALE);
@@ -20,7 +19,7 @@ void sceneInit(struct Scene* scene) {
 
     // quatAxisAngle(&gUp, -M_PI * 0.5f, &scene->camera.transform.rotation);
 
-    mtTileCacheInit(&scene->tileCache, TILE_CACHE_ENTRY_COUNT);
+    mtTileCacheInit(&scene->tileCache, gUseSettings.tileCacheEntryCount);
 
     for (int i = 0; i < gLoadedLevel->megatextureIndexcount; ++i) {
         megatexturePreload(&scene->tileCache, &gLoadedLevel->megatextureIndexes[i]);
@@ -29,22 +28,28 @@ void sceneInit(struct Scene* scene) {
 
 extern Vp fullscreenViewport;
 
+void sceneRenderDebug(struct Scene* scene, struct RenderState* renderState) {
+    gSPDisplayList(renderState->dl++, static_solid_green);
+
+    gDPFillRectangle(renderState->dl++, 32, 32, 32 + (int)(gMtLodBias * 32), 40);
+
+    for (int i = 0; i < 6; ++i) {
+        int y = 48 + i * 8;
+
+        gDPFillRectangle(renderState->dl++, 32, y, 32 + scene->tileCache.tileRequests[i], y + 6);
+    }
+
+    gDPFillRectangle(renderState->dl++, 32, 120, 32 + scene->tileCache.failedRequestsThisFrame, 128);
+}
+
 int sceneRender(struct Scene* scene, struct RenderState* renderState, struct GraphicsTask* task) {
     megatextureRenderStart(&scene->tileCache);
 
     struct CameraMatrixInfo cameraInfo;
-    cameraSetupMatrices(&scene->camera, renderState, (float)SCREEN_WD / SCREEN_HT, 1, &cameraInfo);
+    cameraSetupMatrices(&scene->camera, renderState, (float)gScreenWidth / gScreenHeight, 1, &cameraInfo);
     cameraApplyMatrices(renderState, &cameraInfo);
 
     gSPDisplayList(renderState->dl++, static_tile_image);
-    gDPSetTile(
-        renderState->dl++, 
-        G_IM_FMT_RGBA, 
-        G_IM_SIZ_16b, 8, 0, 0, 0, 
-        G_TX_CLAMP | G_TX_MIRROR, 5, 1, 
-        G_TX_CLAMP | G_TX_MIRROR, 5, 1
-    );
-    gDPSetTileSize(renderState->dl++, 0, 32 << 2, 32 << 2, (32 + 31) << 2, (32 + 31) << 2);
 
     for (int i = 0; i < gLoadedLevel->megatextureIndexcount; ++i) {
         if (!megatextureRender(&scene->tileCache, &gLoadedLevel->megatextureIndexes[i], &cameraInfo, renderState)) {
@@ -53,7 +58,10 @@ int sceneRender(struct Scene* scene, struct RenderState* renderState, struct Gra
         }
     }
 
+    // sceneRenderDebug(scene, renderState);
+
     megatextureRenderEnd(&scene->tileCache, 1);
+
     return 1;
 }
 
@@ -116,4 +124,15 @@ void sceneUpdate(struct Scene* scene) {
     // pitch
     quatAxisAngle(&gRight, pad->stick_y * ROTATE_SPEED * FIXED_DELTA_TIME * (1.0f / 80.0f), &deltaRotate);
     quatMultiply(&tempRotation, &deltaRotate, &scene->camera.transform.rotation);
+
+    if (controllerGetButtonDown(0, U_JPAD)) {
+        gMtLodBias += 1.0f;
+    }
+
+    if (controllerGetButtonDown(0, D_JPAD)) {
+        gMtLodBias -= 1.0f;
+        if (gMtLodBias < 0.0f) {
+            gMtLodBias = 0.0f;
+        }
+    }
 }

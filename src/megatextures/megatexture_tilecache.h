@@ -43,6 +43,8 @@ struct MTTileCache {
     u16 oldestTileFromFrame[2];
     u16 currentTilesThisFrame;
     u16 failedRequestsThisFrame;
+
+    u16 tileRequests[6];
 };
 
 void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount);

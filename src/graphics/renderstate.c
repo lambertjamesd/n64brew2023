@@ -1,8 +1,14 @@
 #include "renderstate.h"
+#include "../util/memory.h"
+
+void renderStateAlloc(struct RenderState* renderState, int displayListLength) {
+    renderState->glist = malloc(sizeof(Gfx) * displayListLength);
+    renderState->displayListLength = displayListLength;
+}
 
 void renderStateInit(struct RenderState* renderState, u16* framebuffer) {
     renderState->dl = renderState->glist;
-    renderState->currentMemoryChunk = &renderState->glist[MAX_DL_LENGTH + MAX_RENDER_STATE_MEMORY_CHUNKS];
+    renderState->currentMemoryChunk = &renderState->glist[renderState->displayListLength];
     renderState->framebuffer = framebuffer;
 }
 
@@ -42,7 +48,7 @@ LookAt* renderStateRequestLookAt(struct RenderState* renderState) {
 }
 
 void renderStateFlushCache(struct RenderState* renderState) {
-    osWritebackDCache(renderState, sizeof(struct RenderState));
+    osWritebackDCache(renderState->glist, sizeof(Gfx) * renderState->displayListLength);
 }
 
 Gfx* renderStateAllocateDLChunk(struct RenderState* renderState, unsigned count) {

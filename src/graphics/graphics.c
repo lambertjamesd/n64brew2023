@@ -2,6 +2,9 @@
 #include "initgfx.h"
 #include "util/memory.h"
 
+int gScreenWidth = 320;
+int gScreenHeight = 240;
+
 struct GraphicsTask gGraphicsTasks[2];
 
 extern OSMesgQueue  gfxFrameMsgQ;
@@ -31,17 +34,34 @@ u64 __attribute__((aligned(16))) gfxYieldBuf2[OS_YIELD_DATA_SIZE/sizeof(u64)];
 u32 firsttime = 1;
 
 u16* graphicsLayoutScreenBuffers(u16* memoryEnd) {
-    gGraphicsTasks[0].framebuffer = memoryEnd - SCREEN_WD * SCREEN_HT;
+    gGraphicsTasks[0].framebuffer = memoryEnd - gScreenWidth * gScreenHeight;
     gGraphicsTasks[0].taskIndex = 0;
     gGraphicsTasks[0].msg.type = OS_SC_DONE_MSG;
 
-    gGraphicsTasks[1].framebuffer = gGraphicsTasks[0].framebuffer - SCREEN_WD * SCREEN_HT;
+    gGraphicsTasks[1].framebuffer = gGraphicsTasks[0].framebuffer - gScreenWidth * gScreenHeight;
     gGraphicsTasks[1].taskIndex = 1;
     gGraphicsTasks[1].msg.type = OS_SC_DONE_MSG;
 
     rdpOutput = (u64*)(gGraphicsTasks[1].framebuffer - RDP_OUTPUT_SIZE  / sizeof(u16));
     zeroMemory(rdpOutput, RDP_OUTPUT_SIZE);
+
+
+    fullscreenViewport.vp.vscale[0] = gScreenWidth * 2;
+    fullscreenViewport.vp.vscale[1] = gScreenHeight * 2;
+    fullscreenViewport.vp.vscale[2] = G_MAXZ/4;
+    fullscreenViewport.vp.vscale[3] = 0;
+
+    fullscreenViewport.vp.vtrans[0] = gScreenWidth * 2;
+    fullscreenViewport.vp.vtrans[1] = gScreenHeight * 2;
+    fullscreenViewport.vp.vtrans[2] = G_MAXZ/4;
+    fullscreenViewport.vp.vtrans[3] = 0;
+
     return (u16*)rdpOutput;
+}
+
+void graphicsAlloc(int displayListLength) {
+    renderStateAlloc(&gGraphicsTasks[0].renderState, displayListLength);
+    renderStateAlloc(&gGraphicsTasks[1].renderState, displayListLength);
 }
 
 #define CLEAR_COLOR GPACK_RGBA5551(0x32, 0x5D, 0x79, 1)
@@ -59,9 +79,10 @@ int graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callbac
 	    firsttime = 0;
     }
     gSPDisplayList(renderState->dl++, setup_rdpstate);	
+    gDPSetScissor(renderState->dl++, G_SC_NON_INTERLACE, 0, 0, gScreenWidth, gScreenHeight);
     
     gDPPipeSync(renderState->dl++);
-    gDPSetColorImage(renderState->dl++, G_IM_FMT_RGBA, G_IM_SIZ_16b, SCREEN_WD, osVirtualToPhysical(targetTask->framebuffer));
+    gDPSetColorImage(renderState->dl++, G_IM_FMT_RGBA, G_IM_SIZ_16b, gScreenWidth, osVirtualToPhysical(targetTask->framebuffer));
 
     gDPPipeSync(renderState->dl++);
     gDPSetCycleType(renderState->dl++, G_CYC_1CYCLE); 

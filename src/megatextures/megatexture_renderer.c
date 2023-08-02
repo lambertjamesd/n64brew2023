@@ -16,9 +16,9 @@
 #define MT_LOD_BIAS_START       1.5f
 #define MT_LOD_BIAS_STEP        (1.0f / 32.0f)
 #define MT_LOD_BIAS_FAIL_STEP   (1.0f / 2.0f)
-#define MT_LOD_BIAS_MIN         1.0f
 
 float gMtLodBias = 1.5f;
+float gMtMinLoadBias = 1.0f;
 
 float mtCalculateMipLevel(float pixelArea) {
     if (pixelArea < MIN_PIXEL_AREA) {
@@ -29,7 +29,7 @@ float mtCalculateMipLevel(float pixelArea) {
 }
 
 float mtScreenSpace(struct CameraMatrixInfo* cameraInfo, struct Vector2* cameraSpacePoint) {
-    return (SCREEN_HT / 2.0f) * cameraInfo->cotFov * cameraSpacePoint->x / cameraSpacePoint->y;
+    return (gScreenHeight / 2.0f) * cameraInfo->cotFov * cameraSpacePoint->x / cameraSpacePoint->y;
 }
 
 void mtUvBasisTransform(struct Vector3* axis, struct Vector3* right, struct Vector3* up, struct Vector2* result) {
@@ -356,6 +356,10 @@ void megatextureRenderStart(struct MTTileCache* tileCache) {
     tileCache->oldestTileFromFrame[0] = MT_NO_TILE_INDEX;
     tileCache->currentTilesThisFrame = 0;
     tileCache->failedRequestsThisFrame = 0;
+
+    for (int i = 0; i < 6; ++i) {
+        tileCache->tileRequests[i] = 0;
+    }
 }
 
 void megatextureRenderEnd(struct MTTileCache* tileCache, int success) {
@@ -373,8 +377,8 @@ void megatextureRenderEnd(struct MTTileCache* tileCache, int success) {
     if (tileCache->currentTilesThisFrame < 3) {
         gMtLodBias -= MT_LOD_BIAS_STEP * 0.25;
 
-        if (gMtLodBias < MT_LOD_BIAS_MIN) {
-            gMtLodBias = MT_LOD_BIAS_MIN;
+        if (gMtLodBias < gMtMinLoadBias) {
+            gMtLodBias = gMtMinLoadBias;
         }
     }
 }

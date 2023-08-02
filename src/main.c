@@ -16,10 +16,13 @@
 #include "sk64/skelatool_animator.h"
 #include "levels/level.h"
 #include "levels/level_list.h"
+#include "scene/game_settings.h"
 
 #ifdef WITH_DEBUGGER
 #include "../debugger/debugger.h"
 #endif
+
+#define FORCE_4MB   0
 
 static OSThread gameThread;
 static OSThread initThread;
@@ -113,20 +116,28 @@ struct SceneCallbacks gTestChamberCallbacks = {
 struct SceneCallbacks* gSceneCallbacks = &gTestChamberCallbacks;
 
 static void gameProc(void* arg) {
+    gameSettingsConfigure(!FORCE_4MB && (osMemSize >= 8 * 1024 * 1024));
+
     u8 schedulerMode = OS_VI_NTSC_LPF1;
 
     int fps = 60;
 
 	switch (osTvType) {
 		case 0: // PAL
-			schedulerMode = HIGH_RES ? OS_VI_PAL_HPF1 : OS_VI_PAL_LPF1;
+			schedulerMode = gUseSettings.highRes ? OS_VI_PAL_HPF1 : OS_VI_PAL_LPF1;
+            gScreenWidth = gUseSettings.highRes ? 640 : 320;
+            gScreenHeight = gUseSettings.highRes ? 480 : 240;
             fps = 50;
 			break;
 		case 1: // NTSC
-			schedulerMode = HIGH_RES ? OS_VI_NTSC_HPF1 : OS_VI_NTSC_LPF1;
+			schedulerMode = gUseSettings.highRes ? OS_VI_NTSC_HPF1 : OS_VI_NTSC_LPF1;
+            gScreenWidth = gUseSettings.highRes ? 640 : 320;
+            gScreenHeight = gUseSettings.highRes ? 480 : 240;
 			break;
 		case 2: // MPAL
-            schedulerMode = HIGH_RES ? OS_VI_MPAL_HPF1 : OS_VI_MPAL_LPF1;
+            schedulerMode = gUseSettings.highRes ? OS_VI_MPAL_HPF1 : OS_VI_MPAL_LPF1;
+            gScreenWidth = gUseSettings.highRes ? 640 : 320;
+            gScreenHeight = gUseSettings.highRes ? 480 : 240;
 			break;
 	}
 
@@ -163,6 +174,7 @@ static void gameProc(void* arg) {
     memoryEnd = (u16*)gAudioHeapBuffer;
 
     heapInit(_heapStart, memoryEnd);
+    graphicsAlloc(gUseSettings.displayListLength);
     romInit();
 
 #ifdef WITH_DEBUGGER

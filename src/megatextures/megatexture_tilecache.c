@@ -4,7 +4,7 @@
 
 #define LARGE_PRIME_NUMBER  1160939981
 
-#define MT_MAX_TILE_REQUESTS_PER_FRAME 32
+int gMtMaxTileRequestsPerFrame = 64;
 
 Gfx mtNopDisplayList[] = {gsSPEndDisplayList()};
 
@@ -251,7 +251,7 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* i
 
     int entryIndex = MT_NO_TILE_INDEX;
     
-    if (tileCache->currentTilesThisFrame < MT_MAX_TILE_REQUESTS_PER_FRAME) {
+    if (tileCache->currentTilesThisFrame < gMtMaxTileRequestsPerFrame) {
         entryIndex = mtTileCacheRemoveOldestUsedTile(tileCache);
     }
 
@@ -286,6 +286,7 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* i
     mtTileCacheAdd(tileCache, entryIndex, hashIndex);
 
     mtTileCacheRequestFromRom(tileCache, entryIndex, romAddress);
+    ++tileCache->tileRequests[lod];
     mtTileCacheFixDisplayList(tileCache, entryIndex, x, y, lod);
     return &tileCache->tileLoaders[entryIndex * MT_GFX_SIZE];
 }

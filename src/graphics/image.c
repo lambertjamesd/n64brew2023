@@ -38,7 +38,7 @@ void graphicsCopyImage(struct RenderState* state, void* source, int iw, int ih, 
 
         int currDx = dx + currX;
 
-        if (currDx >= SCREEN_WD) {
+        if (currDx >= gScreenWidth) {
             break;
         }
 
@@ -51,8 +51,8 @@ void graphicsCopyImage(struct RenderState* state, void* source, int iw, int ih, 
             currDx = 0;
         }
 
-        if (currDx + tileWidth >= SCREEN_WD) {
-            tileWidth = SCREEN_WD - currDx;
+        if (currDx + tileWidth >= gScreenWidth) {
+            tileWidth = gScreenWidth - currDx;
         }
 
         int scaledY = 0;

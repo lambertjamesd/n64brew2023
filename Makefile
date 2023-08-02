@@ -211,6 +211,9 @@ $(BASE_TARGET_NAME)_debug.z64: $(CODESEGMENT)_debug.o $(OBJECTS) $(DATA_OBJECTS)
 clean:
 	rm -rf build
 
+clean-src:
+	rm -rf build/src
+
 fix:
 	wine tools/romfix64.exe build/portal.z64 
 .SECONDARY:

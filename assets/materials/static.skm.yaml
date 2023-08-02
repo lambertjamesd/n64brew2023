@@ -1,6 +1,6 @@
 materials:
   default:
-    gDPSetRenderMode: G_RM_ZB_OPA_SURF
+    gDPSetRenderMode: G_RM_OPA_SURF
     gDPSetTextureFilter: G_TF_BILERP
     gDPSetTexturePersp: G_TP_PERSP
     gDPSetCycleType: G_CYC_1CYCLE
@@ -13,16 +13,28 @@ materials:
     gDPSetCombineMode:
       color: ["0", "0", "0", SHADE]
     gDPSetCycleType: G_CYC_1CYCLE
-    gDPSetRenderMode: G_RM_ZB_OPA_SURF
+    gDPSetRenderMode: G_RM_OPA_SURF
     gSPGeometryMode:
       clear: [G_LIGHTING]
       set: [G_SHADE]
+
+  solid_green:
+    gDPSetCombineMode:
+      color: ["0", "0", "0", PRIMITIVE]
+    gDPSetCycleType: G_CYC_1CYCLE
+    gDPSetRenderMode: G_RM_OPA_SURF
+    gSPGeometryMode:
+      clear: [G_LIGHTING, G_SHADE]
+    gDPSetPrimColor:
+      r: 0
+      g: 255
+      b: 0
 
   vertex_lit:
     gDPSetCombineMode:
       color: ["0", "0", "0", SHADE]
     gDPSetCycleType: G_CYC_1CYCLE
-    gDPSetRenderMode: G_RM_ZB_OPA_SURF
+    gDPSetRenderMode: G_RM_OPA_SURF
     gSPGeometryMode:
       set: [G_SHADE, G_LIGHTING]
 
@@ -45,6 +57,7 @@ materials:
         wrap: false
       t:
         wrap: false
+    gDPSetTextureFilter: G_TF_AVERAGE
     gDPSetCombineMode:
       color: ["0", "0", "0", TEXEL0]
     gDPSetCycleType: G_CYC_1CYCLE

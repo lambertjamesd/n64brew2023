@@ -6,13 +6,8 @@
 #include "renderstate.h"
 #include "defs.h"
 
-#if HIGH_RES
-#define SCREEN_WD   640
-#define SCREEN_HT   480
-#else
-#define SCREEN_WD   320
-#define SCREEN_HT   240
-#endif
+extern int gScreenWidth;
+extern int gScreenHeight;
 
 struct GraphicsTask {
     struct RenderState renderState;
@@ -32,6 +27,7 @@ extern void* gLevelSegment;
 typedef int (*GraphicsCallback)(void* data, struct RenderState* renderState, struct GraphicsTask* task);
 
 u16* graphicsLayoutScreenBuffers(u16* memoryEnd);
+void graphicsAlloc(int displayListLength);
 int graphicsCreateTask(struct GraphicsTask* targetTask, GraphicsCallback callback, void* data);
 
 #endif
