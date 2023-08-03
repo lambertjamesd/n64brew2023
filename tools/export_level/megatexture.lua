@@ -182,8 +182,8 @@ local function distance_to_cutting_mesh(point, plane)
     return result
 end
 
-local function split_mesh_add_loop(behind_loops, front_loops, distance)
-    local result = {}
+local function split_mesh_add_loop(behind_loops, front_loops, distance, result)
+    result = result or {}
 
     if distance < 0 then
         table.insert(behind_loops, result)
@@ -262,7 +262,7 @@ local function split_mesh_loop(edge_loop, plane, edge_points)
             -- the case where the line crosses the plane
             local total_distance = current_distance - prev_distance
             local lerp = current_distance / total_distance
-            local new_point = prev_point:lerp(current_point, lerp)
+            local new_point = current_point:lerp(prev_point, lerp)
             
             edge_points[new_point] = true
             table.insert(current_loop, new_point)
@@ -284,11 +284,11 @@ local function split_mesh_loop(edge_loop, plane, edge_points)
     end
 
     if first_loop == current_loop then
-        first_loop = split_mesh_add_loop(behind_loops, front_loops, current_side)
-    end
-
-    for _, point in ipairs(first_loop) do
-        table.insert(current_loop, point)
+        split_mesh_add_loop(behind_loops, front_loops, current_side, current_loop)
+    else
+        for _, point in ipairs(first_loop) do
+            table.insert(current_loop, point)
+        end
     end
 
     return behind_loops, front_loops
@@ -377,7 +377,7 @@ local function split_mesh_outline(edge_loops, normal, plane)
 
     winding_direction = normal:cross(plane.normal)
 
-    return combine_cut_loops(behind_loops, edge_points, -winding_direction), combine_cut_loops(infront_loops, edge_points, winding_direction)
+    return combine_cut_loops(behind_loops, edge_points, winding_direction), combine_cut_loops(infront_loops, edge_points, -winding_direction)
 end
 
 local function reduce(arr, reducer, initial)
