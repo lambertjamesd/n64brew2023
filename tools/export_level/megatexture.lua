@@ -82,6 +82,22 @@ local function debug_print(...)
     io.write('\n')
 end
 
+local function loop_prev_index(loop, index)
+    if index == 1 then
+        return #loop
+    else
+        return index - 1
+    end
+end
+
+local function loop_next_index(loop, index)
+    if index == #loop then
+        return 1
+    else
+        return index + 1
+    end
+end
+
 local function edge_key(a, b)
     if a > b then
         a, b = b, a
@@ -156,41 +172,126 @@ end
 
 local POINT_ON_EDGE_THRESHOLD = 0.0000001
 
-local function split_mesh_loop(edge_loop, plane)
-    local loop_behind = {}
-    local loop_ahead = {}
-    local split_indices = {}
+local function distance_to_cutting_mesh(point, plane)
+    local result = plane:distance_to_point(point)
+    
+    if math.abs(result) < POINT_ON_EDGE_THRESHOLD then
+        return 0
+    end
 
-    for index, curr in pairs(edge_loop) do
-        next = index < #edge_loop and edge_loop[index + 1] or edge_loop[1]
+    return result
+end
 
-        local distance = plane:distance_to_point(curr)
+local function split_mesh_add_loop(behind_loops, front_loops, distance)
+    local result = {}
 
-        if math.abs(distance) < POINT_ON_EDGE_THRESHOLD then
-            table.insert(loop_behind, curr)
-            table.insert(loop_ahead, curr)
+    if distance < 0 then
+        table.insert(behind_loops, result)
+    else
+        table.insert(front_loops, result)
+    end
 
-            distance = 0
-        elseif distance < 0 then
-            table.insert(loop_behind, curr)
-        else
-            table.insert(loop_ahead, curr)
-        end
+    return result
+end
 
-        local next_distance = plane:distance_to_point(next)
-            
-        if math.abs(next_distance) >= POINT_ON_EDGE_THRESHOLD and distance * next_distance < 0 then
-            local total_distance = distance - next_distance
-            local lerp = distance / total_distance
-            local new_point = curr:lerp(next, lerp)
+local function split_mesh_loop(edge_loop, plane, edge_points)
+    local current_loop = {}
 
-            table.insert(loop_behind, new_point)
-            table.insert(loop_ahead, new_point)
-            table.insert(split_indices, {#loop_behind, #loop_ahead})
+    local first_loop = current_loop
+    local behind_loops = {}
+    local front_loops = {}
+
+    local current_index = 1
+    local prev_distance = 0
+    local prev_point = nil
+    local current_side = 0
+
+    for point_index, point in ipairs(edge_loop) do
+        local distance = distance_to_cutting_mesh(point, plane)
+
+        if distance ~= 0 then
+            current_index = point_index
+            prev_distance = distance
+            prev_point = point
+            current_side = distance
+            break
         end
     end
 
-    return loop_behind, loop_ahead, split_indices
+    if not prev_point then
+        return {}, {}
+    end
+
+    current_index = loop_next_index(edge_loop, current_index)
+
+    for i = 1, #edge_loop do
+        local current_point = edge_loop[current_index]
+        local current_distance = distance_to_cutting_mesh(current_point, plane)
+
+        local skip_point = false
+
+        if current_distance == 0 then
+            local next_index = loop_next_index(edge_loop, current_index)
+            local next_distance = distance_to_cutting_mesh(edge_loop[next_index], plane)
+
+            if next_distance ~= 0 or prev_distance ~= 0 then
+                local crossing_check = next_distance * prev_distance
+
+                if crossing_check < 0 then
+                    -- current point is on the plane with the prev and next points 
+                    -- on either side of the plane
+                    edge_points[current_point] = true
+                    table.insert(current_loop, current_point)
+                    current_loop = split_mesh_add_loop(behind_loops, front_loops, current_distance)
+                    -- point is added to the new loop later on
+                elseif crossing_check == 0 then
+                    edge_points[current_point] = true
+
+                    if next_distance * current_side < 0 then
+                        current_loop = split_mesh_add_loop(behind_loops, front_loops, current_distance)
+                        -- point is added to the new loop later on
+                    end
+                else
+                    -- the loop just kissed the cutting plane, do nothing
+                end
+            else
+                -- this skips any coplanar points along the cutting plane
+                skip_point = true
+            end
+        elseif current_distance * prev_distance < 0 then
+            -- the case where the line crosses the plane
+            local total_distance = current_distance - prev_distance
+            local lerp = current_distance / total_distance
+            local new_point = prev_point:lerp(current_point, lerp)
+            
+            edge_points[new_point] = true
+            table.insert(current_loop, new_point)
+            current_loop = split_mesh_add_loop(behind_loops, front_loops, current_distance)
+            table.insert(current_loop, new_point)
+        end
+
+        if not skip_point then
+            table.insert(current_loop, current_point)
+            prev_distance = current_distance
+            prev_point = current_point
+        end
+
+        if current_distance ~= 0 then
+            current_side = current_distance
+        end
+
+        current_index = loop_next_index(edge_loop, current_index)
+    end
+
+    if first_loop == current_loop then
+        first_loop = split_mesh_add_loop(behind_loops, front_loops, current_side)
+    end
+
+    for _, point in ipairs(first_loop) do
+        table.insert(current_loop, point)
+    end
+
+    return behind_loops, front_loops
 end
 
 local function build_loop_from_split(current_loop_index, current_vertex_index, split_loops, next_edge_point, used_vertices)
@@ -208,11 +309,7 @@ local function build_loop_from_split(current_loop_index, current_vertex_index, s
             current_loop_index = next_on_split.loop_index
             current_vertex_index = next_on_split.index
         else
-            if current_vertex_index == #split_loops[current_loop_index] then
-                current_vertex_index = 1
-            else
-                current_vertex_index = current_vertex_index + 1
-            end
+            current_vertex_index = loop_next_index(split_loops[current_loop_index], current_vertex_index)
         end
 
         current = split_loops[current_loop_index][current_vertex_index]
@@ -221,68 +318,66 @@ local function build_loop_from_split(current_loop_index, current_vertex_index, s
     return result
 end
 
+local function combine_cut_loops(loops, edge_points, winding_direction)
+    local edge_mapping = {}
+
+    for loop_index, loop in ipairs(loops) do
+        for point_index, point in ipairs(loop) do
+            if edge_points[point] then
+                table.insert(edge_mapping, { vertex = point, loop_index = loop_index, index = point_index, sort_key = winding_direction:dot(point)})
+            end
+        end
+    end
+
+    table.sort(edge_mapping, function(a, b) return a.sort_key < b.sort_key end)
+
+    local next_edge_point = {}
+
+    for index = 1,#edge_mapping,2 do
+        local edge_point = edge_mapping[index]
+        local next = edge_mapping[index + 1]
+
+        if next then
+            next_edge_point[edge_point.vertex] = {loop_index = next.loop_index, index = next.index}
+        end
+    end
+
+    local result = {}
+    local used_vertices = {}
+
+    for loop_index = 1,#loops do
+        for point_index = 1,#loops[loop_index] do
+            local new_loop = build_loop_from_split(loop_index, point_index, loops, next_edge_point, used_vertices)
+
+            if #new_loop > 0 then
+                table.insert(result, new_loop)
+            end
+        end
+    end
+
+    return result
+end
+
 local function split_mesh_outline(edge_loops, normal, plane)
     local behind_loops = {}
     local infront_loops = {}
-
     local edge_points = {}
 
-    local sort_axis = normal:cross(plane.normal)
+    for _, loop in ipairs(edge_loops) do
+        local new_behind_loops, new_infront_loops = split_mesh_loop(loop, plane, edge_points)
 
-    for loop_index, loop in pairs(edge_loops) do
-        local behind, infront, indices = split_mesh_loop(loop, plane)
-        table.insert(behind_loops, behind)
-        table.insert(infront_loops, infront)
+        for _, loop in ipairs(new_behind_loops) do
+            table.insert(behind_loops, loop)
+        end
 
-        for _, index in pairs(indices) do
-            local vertex = behind[index[1]]
-            table.insert(edge_points, {vertex = vertex, sort_key = vertex:dot(sort_axis), loop_index = loop_index, indices = index})
+        for _, loop in ipairs(new_infront_loops) do
+            table.insert(infront_loops, loop)
         end
     end
 
-    table.sort(edge_points, function(a, b) return a.sort_key < b.sort_key end)
+    winding_direction = normal:cross(plane.normal)
 
-    local next_edge_point = {}
-    local prev_edge_point = {}
-
-    for index = 1,#edge_points,2 do
-        local edge_point = edge_points[index]
-        local next = edge_points[index + 1]
-
-        if next then
-            next_edge_point[edge_point.vertex] = {loop_index = next.loop_index, index = next.indices[1]}
-            prev_edge_point[next.vertex] = {loop_index = edge_point.loop_index, index = edge_point.indices[2]}
-        end
-    end
-
-    local used_vertices = {}
-
-    local result_behind = {}
-    local result_infront = {}
-
-    for loop_index, loop in pairs(behind_loops) do
-        for index, _ in pairs(loop) do
-            local new_loop = build_loop_from_split(loop_index, index, behind_loops, next_edge_point, used_vertices)
-
-            if #new_loop > 0 then
-                table.insert(result_behind, new_loop)
-            end
-        end
-    end
-
-    used_vertices = {}
-
-    for loop_index, loop in pairs(infront_loops) do
-        for index, _ in pairs(loop) do
-            local new_loop = build_loop_from_split(loop_index, index, infront_loops, prev_edge_point, used_vertices)
-
-            if #new_loop > 0 then
-                table.insert(result_infront, new_loop)
-            end
-        end
-    end
-
-    return result_behind, result_infront
+    return combine_cut_loops(behind_loops, edge_points, -winding_direction), combine_cut_loops(infront_loops, edge_points, winding_direction)
 end
 
 local function reduce(arr, reducer, initial)
@@ -694,22 +789,6 @@ local function join_loops(a, a_index, b, b_index)
     end
 
     return result
-end
-
-local function loop_prev_index(loop, index)
-    if index == 1 then
-        return #loop
-    else
-        return index - 1
-    end
-end
-
-local function loop_next_index(loop, index)
-    if index == #loop then
-        return 1
-    else
-        return index + 1
-    end
 end
 
 local function is_point_contained(triangle_vertices, point)
