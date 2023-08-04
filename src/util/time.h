@@ -7,7 +7,7 @@ extern float gTimePassed;
 extern OSTime gLastTime;
 extern int gCurrentFrame;
 
-#define FRAME_SKIP  1
+#define FRAME_SKIP  0
 #define FIXED_DELTA_TIME    ((1.0f + FRAME_SKIP) / 60.0f)
 
 void timeUpdateDelta();
