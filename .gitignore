@@ -26,3 +26,5 @@ src/controls/controller-data.h
 assets/materials/megatextures
 
 world_high_res/
+
+texture_unpack/*.png

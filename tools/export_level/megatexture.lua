@@ -4,7 +4,7 @@ local sk_math = require('sk_math')
 local sk_input = require('sk_input')
 local sk_transform = require('sk_transform')
 
-local lod_reduction = 2
+local lod_reduction = 0
 
 local function debug_print_recursive(any, line_prefix, already_visited)
     if type(any) == 'table' then
