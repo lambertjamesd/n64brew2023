@@ -47,6 +47,7 @@ struct MTTileIndex {
     struct Vector2 minUv;
     struct Vector2 maxUv;
     float worldPixelSize;
+    s16 sortGroup;
 };
 
 #endif

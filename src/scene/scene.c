@@ -43,7 +43,6 @@ void sceneRenderDebug(struct Scene* scene, struct RenderState* renderState) {
 }
 
 int sceneRender(struct Scene* scene, struct RenderState* renderState, struct GraphicsTask* task) {
-    megatextureRenderStart(&scene->tileCache);
 
     struct CameraMatrixInfo cameraInfo;
     cameraSetupMatrices(&scene->camera, renderState, (float)gScreenWidth / gScreenHeight, 1, &cameraInfo);
@@ -51,18 +50,7 @@ int sceneRender(struct Scene* scene, struct RenderState* renderState, struct Gra
 
     gSPDisplayList(renderState->dl++, static_tile_image);
 
-    for (int i = 0; i < gLoadedLevel->megatextureIndexcount; ++i) {
-        if (!megatextureRender(&scene->tileCache, &gLoadedLevel->megatextureIndexes[i], &cameraInfo, renderState)) {
-            megatextureRenderEnd(&scene->tileCache, 0);
-            return 0;
-        }
-    }
-
-    // sceneRenderDebug(scene, renderState);
-
-    megatextureRenderEnd(&scene->tileCache, 1);
-
-    return 1;
+    return megatexturesRenderAll(&scene->tileCache, gLoadedLevel->megatextureIndexes, gLoadedLevel->megatextureIndexcount, &cameraInfo, renderState);
 }
 
 void playerGetMoveBasis(struct Transform* transform, struct Vector3* forward, struct Vector3* right) {

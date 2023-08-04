@@ -14,4 +14,6 @@ int megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, 
 void megatexturePreload(struct MTTileCache* tileCache, struct MTTileIndex* index);
 void megatextureRenderEnd(struct MTTileCache* tileCache, int success);
 
+int megatexturesRenderAll(struct MTTileCache* tileCache, struct MTTileIndex* index, int count, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState);
+
 #endif

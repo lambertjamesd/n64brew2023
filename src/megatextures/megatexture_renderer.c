@@ -6,6 +6,7 @@
 #include "../math/mathf.h"
 #include <math.h>
 #include "../graphics/graphics.h"
+#include "../util/memory.h"
 
 #define MT_MAX_LOD              5
 #define MT_MIP_SAMPLE_COUNT     3
@@ -381,4 +382,83 @@ void megatextureRenderEnd(struct MTTileCache* tileCache, int success) {
             gMtLodBias = gMtMinLoadBias;
         }
     }
+}
+
+struct SortInfo {
+    float sortKey;
+    int index;
+};
+
+void megatexturesSort(struct SortInfo* values, struct SortInfo* tmp, int min, int max) {
+    if (min + 1 >= max) {
+        return;
+    }
+
+    int mid = (min + max) / 2;
+
+    megatexturesSort(values, tmp, min, mid);
+    megatexturesSort(values, tmp, mid, max);
+
+    int srcA = min;
+    int srcB = mid;
+
+    int write = min;
+
+    while (srcA < mid || srcB < max) {
+        if (srcB >= max || (srcA < mid && values[srcA].sortKey > values[srcB].sortKey)) {
+            tmp[write++] = values[srcA++];
+        } else {
+            tmp[write++] = values[srcB++];
+        }
+    }
+
+    for (int i = min; i < max; ++i) {
+        values[i] = tmp[i];
+    }
+}
+
+int megatexturesRenderAll(struct MTTileCache* tileCache, struct MTTileIndex* index, int count, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState) {
+    megatextureRenderStart(tileCache);
+
+    int currentFace = 0;
+
+    while (currentFace < count && index[currentFace].sortGroup < 0) {
+        if (!megatextureRender(tileCache, &index[currentFace], cameraInfo, renderState)) {
+            megatextureRenderEnd(tileCache, 0);
+            return 0;
+        }
+
+        ++currentFace;
+    }
+
+    int sortedFaceCount = count - currentFace;
+    struct SortInfo* sortInfo = stackMalloc(sizeof(struct SortInfo) * sortedFaceCount);
+    int currentSortFace = 0;
+
+    while (currentFace < count) {
+        struct Vector3 furthestPoint;
+        box3DSupportFunction(&index[currentFace].boundingBox, &cameraInfo->forwardVector, &furthestPoint);
+        sortInfo[currentSortFace].sortKey = vector3Dot(&furthestPoint, &cameraInfo->forwardVector);
+        sortInfo[currentSortFace].index = currentFace;
+        ++currentFace;
+        ++currentSortFace;
+    }
+
+    struct SortInfo* tmpMemory = stackMalloc(sizeof(struct SortInfo) * sortedFaceCount);
+
+    megatexturesSort(sortInfo, tmpMemory, 0, sortedFaceCount);
+
+    for (int i = 0; i < sortedFaceCount; ++i) {
+        if (!megatextureRender(tileCache, &index[sortInfo[i].index], cameraInfo, renderState)) {
+            megatextureRenderEnd(tileCache, 0);
+            return 0;
+        }
+    }
+
+    stackMallocFree(tmpMemory);
+    stackMallocFree(sortInfo);
+
+    megatextureRenderEnd(tileCache, 1);
+
+    return 1;
 }

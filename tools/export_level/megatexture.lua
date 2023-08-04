@@ -1084,7 +1084,7 @@ local function write_mesh_tiles(megatexture_model, layer)
     }
 end 
 
-local function write_tile_index(world_mesh, megatexture_model)
+local function write_tile_index(world_mesh, megatexture_model, sort_group)
     local layers = {}
     local imageLayers = {}
 
@@ -1119,17 +1119,38 @@ local function write_tile_index(world_mesh, megatexture_model)
             (megatexture_model.uv_basis.right:magnitude() / megatexture_model.texture.width) *
             (megatexture_model.uv_basis.up:magnitude() / megatexture_model.texture.height)
         ),
+        sortGroup = sort_group,
     }
 end
 
 local megatexture_indexes = {}
 
-for _, node in pairs(sk_scene.nodes_for_type('@megatexture')) do
+local megatexture_nodes = sk_scene.nodes_for_type('@megatexture')
+
+local function find_sort_group(arguments)
+    for index, arg in ipairs(arguments) do
+        if arg == 'sort_group' then
+            return arguments[index + 1] and tonumber(arguments[index + 1]) or 0
+        end
+    end
+
+    return 0
+end
+
+for _, node in ipairs(megatexture_nodes) do
+    node.sort_group = find_sort_group(node.arguments)
+end
+
+table.sort(megatexture_nodes, function(a, b) 
+    return a.sort_group < b.sort_group
+end)
+
+for _, node in ipairs(megatexture_nodes) do
     if #node.node.meshes > 0 then
         local world_mesh = node.node.meshes[1]:transform(node.node.full_transformation)
         print('processing ' .. world_mesh.name)
         local megatexture_model = build_megatexture_model(world_mesh)
-        local megatexture_index = write_tile_index(world_mesh, megatexture_model)
+        local megatexture_index = write_tile_index(world_mesh, megatexture_model, node.sort_group)
         table.insert(megatexture_indexes, megatexture_index) 
     end
 end
