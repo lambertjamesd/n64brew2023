@@ -118,9 +118,8 @@ int cameraSetupMatrices(struct Camera* camera, struct RenderState* renderState, 
         cameraExtractClippingPlane(combined, &output->cullingInformation.clippingPlanes[1], 0, -1.0f);
         cameraExtractClippingPlane(combined, &output->cullingInformation.clippingPlanes[2], 1, 1.0f);
         cameraExtractClippingPlane(combined, &output->cullingInformation.clippingPlanes[3], 1, -1.0f);
-        cameraExtractClippingPlane(combined, &output->cullingInformation.clippingPlanes[4], 2, 1.0f);
         output->cullingInformation.cameraPos = camera->transform.position;
-        output->cullingInformation.usedClippingPlaneCount = 5;
+        output->cullingInformation.usedClippingPlaneCount = 4;
     }
 
     return 1;
