@@ -4,7 +4,7 @@ local sk_math = require('sk_math')
 local sk_input = require('sk_input')
 local sk_transform = require('sk_transform')
 
-local lod_reduction = 0
+local lod_reduction = 2
 
 local function debug_print_recursive(any, line_prefix, already_visited)
     if type(any) == 'table' then
@@ -170,7 +170,7 @@ local function build_mesh_outline(model)
     return edge_loops
 end
 
-local POINT_ON_EDGE_THRESHOLD = 0.0000001
+local POINT_ON_EDGE_THRESHOLD = 0.0001
 
 local function distance_to_cutting_mesh(point, plane)
     local result = plane:distance_to_point(point)
@@ -242,13 +242,13 @@ local function split_mesh_loop(edge_loop, plane, edge_points)
                     -- on either side of the plane
                     edge_points[current_point] = true
                     table.insert(current_loop, current_point)
-                    current_loop = split_mesh_add_loop(behind_loops, front_loops, current_distance)
+                    current_loop = split_mesh_add_loop(behind_loops, front_loops, next_distance)
                     -- point is added to the new loop later on
                 elseif crossing_check == 0 then
                     edge_points[current_point] = true
 
                     if next_distance * current_side < 0 then
-                        current_loop = split_mesh_add_loop(behind_loops, front_loops, current_distance)
+                        current_loop = split_mesh_add_loop(behind_loops, front_loops, next_distance)
                         -- point is added to the new loop later on
                     end
                 else
@@ -592,6 +592,17 @@ local function determine_vertex_mapping(previous_loop, loop, next_loop)
     local middle_indices = {}
     local end_indices = {}
 
+    -- ensure the same order from previous loop 
+    if previous_loop then
+        for _, prev_point in ipairs(previous_loop) do
+            for index, vertex in ipairs(loop) do
+                if vertex == prev_point then
+                    table.insert(beginning_indices, index)
+                end
+            end
+        end
+    end
+
     for index, vertex in ipairs(loop) do
         local priority = 0
 
@@ -612,7 +623,7 @@ local function determine_vertex_mapping(previous_loop, loop, next_loop)
         end
 
         if priority == -1 then
-            table.insert(beginning_indices, index)
+            -- already added from previous loop
         elseif priority == 0 then
             table.insert(middle_indices, index)
         else
@@ -964,9 +975,9 @@ local function write_mesh_tiles(megatexture_model, layer)
     for y, row in ipairs(layer.mesh_tiles) do
         local current_mesh_data = nil
         local next_mesh_data = row[1] and fill_mesh(megatexture_model, row[1])
+        local prev_overlap = nil
 
         for x, cell in ipairs(row) do
-            local previous_loop = current_mesh_data and current_mesh_data.vertices
             current_mesh_data = next_mesh_data
             next_mesh_data = row[x + 1] and fill_mesh(megatexture_model, row[x + 1])
 
@@ -982,7 +993,13 @@ local function write_mesh_tiles(megatexture_model, layer)
             end
 
             local next_loop = next_mesh_data and next_mesh_data.vertices
-            local vertex_mapping = determine_vertex_mapping(previous_loop, current_loop, next_loop)
+            local vertex_mapping = determine_vertex_mapping(prev_overlap, current_loop, next_loop)
+
+            prev_overlap = {}
+
+            for i = #current_loop - vertex_mapping.ending_overlap + 1, #current_loop do
+                table.insert(prev_overlap, current_loop[vertex_mapping.new_to_old_index[i]])
+            end
 
             local beginning_vertex = #vertices + 1 - vertex_mapping.beginning_overlap
 
