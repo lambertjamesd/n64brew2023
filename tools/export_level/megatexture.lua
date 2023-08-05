@@ -803,9 +803,13 @@ local function join_loops(a, a_index, b, b_index)
 end
 
 local function is_point_contained(triangle_vertices, point)
-    return (triangle_vertices[1] - point):cross(triangle_vertices[2] - triangle_vertices[1]).z > 0 and
-        (triangle_vertices[2] - point):cross(triangle_vertices[3] - triangle_vertices[2]).z > 0 and
-        (triangle_vertices[3] - point):cross(triangle_vertices[1] - triangle_vertices[3]).z > 0
+    local a = (triangle_vertices[1] - point):cross(triangle_vertices[2] - triangle_vertices[1]).z
+    local b = (triangle_vertices[2] - point):cross(triangle_vertices[3] - triangle_vertices[2]).z
+    local c = (triangle_vertices[3] - point):cross(triangle_vertices[1] - triangle_vertices[3]).z
+
+    return a > -0.0001 and
+        b > -0.0001 and
+        c > -0.0001
 end
 
 local function do_points_cross_plane(plane_tangent, plane_origin, a, b)
@@ -1051,10 +1055,6 @@ local function write_mesh_tiles(megatexture_model, layer)
 
         table.insert(indices, sk_definition_writer.newline)
     end
-
-    local tiles_x_bits = calc_bits_needed(max_tile_x + 1 - min_tile_x)
-
-    local row_size = 1 << tiles_x_bits;
 
     local filtered_tiles = {}
 
