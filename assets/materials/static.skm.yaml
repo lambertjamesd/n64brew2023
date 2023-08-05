@@ -61,6 +61,6 @@ materials:
     gDPSetCombineMode:
       color: ["0", "0", "0", TEXEL0]
     gDPSetCycleType: G_CYC_1CYCLE
-    gDPSetRenderMode: G_RM_OPA_SURF
+    gDPSetRenderMode: G_RM_AA_OPA_SURF
     gSPGeometryMode:
       clear: [G_LIGHTING, G_SHADE]

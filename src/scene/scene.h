@@ -11,6 +11,7 @@
 struct Scene {
     struct Camera camera;
     struct MTTileCache tileCache;
+    float verticalVelocity;
 };
 
 void sceneInit(struct Scene* scene);

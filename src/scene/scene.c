@@ -4,26 +4,36 @@
 #include "../build/assets/materials/static.h"
 #include "../levels/level.h"
 #include "../megatextures/megatexture_renderer.h"
+#include "./collision.h"
+#include "../math/mathf.h"
 
 #include "../controls/controller.h"
 
 #include "../util/time.h"
 #include "game_settings.h"
 
+#define PLAYER_RADIUS   0.125f
+#define PLAYER_HEAD_HEIGHT  2.0f
+#define PLAYER_HEAD_VELOCITY    3.0f
+
+#define GRAVITY     -9.8f
+
 void sceneInit(struct Scene* scene) {
     cameraInit(&scene->camera, 70.0f, 0.125f * SCENE_SCALE, 20.0f * SCENE_SCALE);
 
     scene->camera.transform.position.x = 0.0f;
-    scene->camera.transform.position.y = 1.0f;
+    scene->camera.transform.position.y = PLAYER_HEAD_HEIGHT;
     scene->camera.transform.position.z = 6.0f;
 
     // quatAxisAngle(&gUp, -M_PI * 0.5f, &scene->camera.transform.rotation);
 
     mtTileCacheInit(&scene->tileCache, gUseSettings.tileCacheEntryCount);
 
-    for (int i = 0; i < gLoadedLevel->megatextureIndexcount; ++i) {
+    for (int i = 0; i < gLoadedLevel->megatextureIndexCount; ++i) {
         megatexturePreload(&scene->tileCache, &gLoadedLevel->megatextureIndexes[i]);
     }
+
+    scene->verticalVelocity = 0.0f;
 }
 
 extern Vp fullscreenViewport;
@@ -31,15 +41,18 @@ extern Vp fullscreenViewport;
 void sceneRenderDebug(struct Scene* scene, struct RenderState* renderState) {
     gSPDisplayList(renderState->dl++, static_solid_green);
 
-    gDPFillRectangle(renderState->dl++, 32, 32, 32 + (int)(gMtLodBias * 32), 40);
+    gDPFillRectangle(renderState->dl++, 64, 64, 64 + (int)(gMtLodBias * 32), 72);
 
     for (int i = 0; i < 6; ++i) {
-        int y = 48 + i * 8;
+        int y = 80 + i * 8;
 
-        gDPFillRectangle(renderState->dl++, 32, y, 32 + scene->tileCache.tileRequests[i], y + 6);
+        gDPFillRectangle(renderState->dl++, 64, y, 64 + scene->tileCache.tileRequests[i], y + 6);
     }
 
-    gDPFillRectangle(renderState->dl++, 32, 120, 32 + scene->tileCache.failedRequestsThisFrame, 128);
+    gDPFillRectangle(renderState->dl++, 64, 152, 64 + scene->tileCache.totalTileRequests, 160);
+
+    gDPSetPrimColor(renderState->dl++, 255, 255, 255, 0, 0, 255);
+    gDPFillRectangle(renderState->dl++, 64, 178, 64 + scene->tileCache.overflowRequestCount, 186);
 }
 
 int sceneRender(struct Scene* scene, struct RenderState* renderState, struct GraphicsTask* task) {
@@ -50,7 +63,13 @@ int sceneRender(struct Scene* scene, struct RenderState* renderState, struct Gra
 
     gSPDisplayList(renderState->dl++, static_tile_image);
 
-    return megatexturesRenderAll(&scene->tileCache, gLoadedLevel->megatextureIndexes, gLoadedLevel->megatextureIndexcount, &cameraInfo, renderState);
+    if (!megatexturesRenderAll(&scene->tileCache, gLoadedLevel->megatextureIndexes, gLoadedLevel->megatextureIndexCount, &cameraInfo, renderState)) {
+        return 0;
+    }
+
+    sceneRenderDebug(scene, renderState);
+
+    return 1;
 }
 
 void playerGetMoveBasis(struct Transform* transform, struct Vector3* forward, struct Vector3* right) {
@@ -112,6 +131,28 @@ void sceneUpdate(struct Scene* scene) {
     // pitch
     quatAxisAngle(&gRight, pad->stick_y * ROTATE_SPEED * FIXED_DELTA_TIME * (1.0f / 80.0f), &deltaRotate);
     quatMultiply(&tempRotation, &deltaRotate, &scene->camera.transform.rotation);
+
+    scene->verticalVelocity += GRAVITY * FIXED_DELTA_TIME;
+    scene->camera.transform.position.y += scene->verticalVelocity * FIXED_DELTA_TIME;
+
+    for (int i = 0; i < gLoadedLevel->collisionQuadCount; ++i) {
+        collisionCollideSphere(&gLoadedLevel->collisionQuads[i], &scene->camera.transform.position, PLAYER_RADIUS);
+
+        float contactPoint;
+        if (collisionCheckFloorHeight(&gLoadedLevel->collisionQuads[i], &scene->camera.transform.position, &contactPoint)) {
+            float height = scene->camera.transform.position.y - contactPoint;
+
+            if (height < PLAYER_HEAD_HEIGHT) {
+                scene->verticalVelocity = 0.0f;
+                scene->camera.transform.position.y = mathfMoveTowards(scene->camera.transform.position.y, contactPoint + PLAYER_HEAD_HEIGHT, PLAYER_HEAD_VELOCITY * FIXED_DELTA_TIME);
+            }
+        }
+    }
+
+    if (scene->camera.transform.position.y < PLAYER_HEAD_HEIGHT) {
+        scene->verticalVelocity = 0.0f;
+        scene->camera.transform.position.y = PLAYER_HEAD_HEIGHT;
+    }
 
     if (controllerGetButtonDown(0, U_JPAD)) {
         gMtLodBias += 1.0f;

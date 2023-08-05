@@ -68,8 +68,9 @@ void mtTileCacheInit(struct MTTileCache* tileCache, int entryCount) {
     tileCache->nextOutboundMessage = 0;
     tileCache->oldestTileFromFrame[0] = MT_NO_TILE_INDEX;
     tileCache->oldestTileFromFrame[1] = MT_NO_TILE_INDEX;
-    tileCache->currentTilesThisFrame = 0;
-    tileCache->failedRequestsThisFrame = 0;
+    tileCache->tilesRequestedFromCart = 0;
+    tileCache->totalTileRequests = 0;
+    tileCache->overflowRequestCount = 0;
 }
 
 int mtTileCacheRemoveOldestUsedTile(struct MTTileCache* tileCache) {
@@ -78,6 +79,7 @@ int mtTileCacheRemoveOldestUsedTile(struct MTTileCache* tileCache) {
     if (entryIndex == tileCache->oldestTileFromFrame[1]) {
         // this tile was already used this frame and
         // there are no more availible tiles
+        ++tileCache->overflowRequestCount;
         return MT_NO_TILE_INDEX;
     }
 
@@ -243,6 +245,8 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* i
     u64* romAddress = MT_DETERMINE_ROM_ADDRESS(imageLayer, x, y);
     int hashIndex = MT_HASH(tileCache, romAddress);
 
+    ++tileCache->totalTileRequests;
+
     Gfx* result = mtTileCacheSearch(tileCache, romAddress, hashIndex);
 
     if (result) {
@@ -251,13 +255,11 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* i
 
     int entryIndex = MT_NO_TILE_INDEX;
     
-    if (tileCache->currentTilesThisFrame < gMtMaxTileRequestsPerFrame) {
+    if (tileCache->tilesRequestedFromCart < gMtMaxTileRequestsPerFrame) {
         entryIndex = mtTileCacheRemoveOldestUsedTile(tileCache);
     }
 
     if (entryIndex == MT_NO_TILE_INDEX) {
-        ++tileCache->failedRequestsThisFrame;
-
         // cant request any new tiles this frame
         // resort to searching for any existing
         // loaded tile
@@ -281,7 +283,7 @@ Gfx* mtTileCacheRequestTile(struct MTTileCache* tileCache, struct MTTileIndex* i
         return mtNopDisplayList;
     }
 
-    ++tileCache->currentTilesThisFrame;
+    ++tileCache->tilesRequestedFromCart;
 
     mtTileCacheAdd(tileCache, entryIndex, hashIndex);
 

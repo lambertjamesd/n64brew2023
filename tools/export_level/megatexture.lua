@@ -4,7 +4,7 @@ local sk_math = require('sk_math')
 local sk_input = require('sk_input')
 local sk_transform = require('sk_transform')
 
-local lod_reduction = 0
+local lod_reduction = 2
 
 local function debug_print_recursive(any, line_prefix, already_visited)
     if type(any) == 'table' then
@@ -1095,7 +1095,7 @@ local function write_tile_index(world_mesh, megatexture_model, sort_group)
             tileSource = get_tiles_reference(layer),
             xTiles = layer.tile_count_x,
             yTiles = layer.tile_count_y,
-            isAlwaysLoaded = layer.tile_count_x <= 4 and layer.tile_count_y <= 4,
+            isAlwaysLoaded = layer.tile_count_x <= 2 and layer.tile_count_y <= 2,
         })
     end
 

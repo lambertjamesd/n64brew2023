@@ -12,6 +12,11 @@
 #define MT_MIP_SAMPLE_COUNT     3
 #define MT_LOG_INV_2 1.442695041
 
+#define MT_MAX_TOTAL_TILE_REQUESTS  500
+
+#define MT_MIN_TOTAL_TILE_REQUESTS  400
+#define MT_MAX_TILE_UNDER_LOADED    64
+
 #define MIN_PIXEL_AREA          0.000061035
 
 #define MT_LOD_BIAS_START       1.5f
@@ -355,12 +360,34 @@ void megatexturePreload(struct MTTileCache* tileCache, struct MTTileIndex* index
 void megatextureRenderStart(struct MTTileCache* tileCache) {
     tileCache->oldestTileFromFrame[1] = tileCache->oldestTileFromFrame[0];
     tileCache->oldestTileFromFrame[0] = MT_NO_TILE_INDEX;
-    tileCache->currentTilesThisFrame = 0;
-    tileCache->failedRequestsThisFrame = 0;
+    tileCache->tilesRequestedFromCart = 0;
+    tileCache->totalTileRequests = 0;
+    tileCache->overflowRequestCount = 0;
 
     for (int i = 0; i < 6; ++i) {
         tileCache->tileRequests[i] = 0;
     }
+}
+
+int megatexturesDoesHaveExtraSpace(struct MTTileCache* tileCache) {
+    int extraCount = 0;
+    
+    int entryIndex = tileCache->oldestUsedTile;
+
+    while (entryIndex != tileCache->oldestTileFromFrame[1]) {
+        // this tile was already used this frame and
+        // there are no more availible tiles
+        ++extraCount;
+
+        if (extraCount == MT_MAX_TILE_UNDER_LOADED) {
+            return 1;
+        }
+        
+        entryIndex = tileCache->entries[entryIndex].newerTile;
+    }
+
+
+    return 0;
 }
 
 void megatextureRenderEnd(struct MTTileCache* tileCache, int success) {
@@ -371,11 +398,9 @@ void megatextureRenderEnd(struct MTTileCache* tileCache, int success) {
         return;
     }
 
-    if (tileCache->failedRequestsThisFrame) {
+    if (tileCache->overflowRequestCount || tileCache->totalTileRequests > MT_MAX_TOTAL_TILE_REQUESTS) {
         gMtLodBias += MT_LOD_BIAS_STEP;
-    }
-
-    if (tileCache->currentTilesThisFrame < 3) {
+    } else if (megatexturesDoesHaveExtraSpace(tileCache) && tileCache->totalTileRequests < MT_MIN_TOTAL_TILE_REQUESTS) {
         gMtLodBias -= MT_LOD_BIAS_STEP * 0.25;
 
         if (gMtLodBias < gMtMinLoadBias) {
@@ -438,6 +463,7 @@ int megatexturesRenderAll(struct MTTileCache* tileCache, struct MTTileIndex* ind
     while (currentFace < count) {
         struct Vector3 furthestPoint;
         box3DSupportFunction(&index[currentFace].boundingBox, &cameraInfo->forwardVector, &furthestPoint);
+        furthestPoint.y = 0.0f;
         sortInfo[currentSortFace].sortKey = vector3Dot(&furthestPoint, &cameraInfo->forwardVector);
         sortInfo[currentSortFace].index = currentFace;
         ++currentFace;

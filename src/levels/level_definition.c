@@ -27,9 +27,11 @@ struct LevelDefinition* levelDefinitionFixPointers(struct LevelDefinition* sourc
 
     result->megatextureIndexes = ADJUST_POINTER_POS(result->megatextureIndexes, pointerOffset);
 
-    for (int i = 0; i < result->megatextureIndexcount; ++i) {
+    for (int i = 0; i < result->megatextureIndexCount; ++i) {
         levelDefinitionFixTileIndexPointers(&result->megatextureIndexes[i], pointerOffset, imagePointerOffset);
     }
+
+    result->collisionQuads = ADJUST_POINTER_POS(result->collisionQuads, pointerOffset);
 
     return result;
 }

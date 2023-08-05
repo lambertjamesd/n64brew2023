@@ -41,8 +41,9 @@ struct MTTileCache {
     // index 0 is the current frame
     // index 1 is the previous frame
     u16 oldestTileFromFrame[2];
-    u16 currentTilesThisFrame;
-    u16 failedRequestsThisFrame;
+    u16 tilesRequestedFromCart;
+    u16 totalTileRequests;
+    u16 overflowRequestCount;
 
     u16 tileRequests[6];
 };

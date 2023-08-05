@@ -5,8 +5,8 @@
 struct GameSettings gUseSettings;
 
 void gameSettingsConfigure(int hasExpansion) {
-    gUseSettings.displayListLength = hasExpansion ? 3600 : 14400;
-    gUseSettings.tileCacheEntryCount = hasExpansion ? 512 : 2048;
+    gUseSettings.displayListLength = hasExpansion ? 14400 : 3600;
+    gUseSettings.tileCacheEntryCount = hasExpansion ? 2048 : 1024;
     gUseSettings.highRes = hasExpansion ? 1 : 0;
     gUseSettings.minLodBias = hasExpansion ? 1.0f : 0.0f;
 
