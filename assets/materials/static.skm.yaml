@@ -59,8 +59,12 @@ materials:
         wrap: false
     gDPSetTextureFilter: G_TF_AVERAGE
     gDPSetCombineMode:
-      color: ["0", "0", "0", TEXEL0]
+      color: [PRIMITIVE, "0", TEXEL0, "0"]
     gDPSetCycleType: G_CYC_1CYCLE
     gDPSetRenderMode: G_RM_AA_OPA_SURF
+    gDPSetPrimColor:
+      r: 255
+      g: 255
+      b: 255
     gSPGeometryMode:
       clear: [G_LIGHTING, G_SHADE]

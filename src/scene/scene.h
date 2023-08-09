@@ -12,6 +12,7 @@ struct Scene {
     struct Camera camera;
     struct MTTileCache tileCache;
     float verticalVelocity;
+    float fadeTimer;
 };
 
 void sceneInit(struct Scene* scene);

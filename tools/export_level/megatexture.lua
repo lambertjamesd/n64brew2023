@@ -4,7 +4,7 @@ local sk_math = require('sk_math')
 local sk_input = require('sk_input')
 local sk_transform = require('sk_transform')
 
-local lod_reduction = 2
+local lod_reduction = 0
 
 local function debug_print_recursive(any, line_prefix, already_visited)
     if type(any) == 'table' then
@@ -405,9 +405,9 @@ local function determine_uv_basis(model)
         error('Model does not have texture cooridnates')
     end
 
-    local o_idx = find_idx_in_dir(model.uv, sk_math.vector3(-1, -1, 0))
-    local r_idx = find_idx_in_dir(model.uv, sk_math.vector3(1, -1, 0))
-    local u_idx = find_idx_in_dir(model.uv, sk_math.vector3(-1, 1, 0))
+    local o_idx = 1
+    local r_idx = 2
+    local u_idx = 3
 
     -- define the origin relative to the image origin (top left)
     texture_cooridate_mtx = sk_transform.from_array({

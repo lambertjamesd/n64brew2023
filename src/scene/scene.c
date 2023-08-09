@@ -13,17 +13,20 @@
 #include "game_settings.h"
 
 #define PLAYER_RADIUS   0.125f
-#define PLAYER_HEAD_HEIGHT  2.0f
+#define PLAYER_HEAD_HEIGHT  3.0f
 #define PLAYER_HEAD_VELOCITY    3.0f
 
 #define GRAVITY     -9.8f
+
+#define FADE_IN_DELAY   1.0f
+#define FADE_IN_TIME    2.0f
 
 void sceneInit(struct Scene* scene) {
     cameraInit(&scene->camera, 70.0f, 0.125f * SCENE_SCALE, 20.0f * SCENE_SCALE);
 
     scene->camera.transform.position.x = 0.0f;
     scene->camera.transform.position.y = PLAYER_HEAD_HEIGHT;
-    scene->camera.transform.position.z = 6.0f;
+    scene->camera.transform.position.z = 14.0f;
 
     // quatAxisAngle(&gUp, -M_PI * 0.5f, &scene->camera.transform.rotation);
 
@@ -34,6 +37,8 @@ void sceneInit(struct Scene* scene) {
     }
 
     scene->verticalVelocity = 0.0f;
+
+    scene->fadeTimer = FADE_IN_DELAY + FADE_IN_TIME;
 }
 
 extern Vp fullscreenViewport;
@@ -63,11 +68,19 @@ int sceneRender(struct Scene* scene, struct RenderState* renderState, struct Gra
 
     gSPDisplayList(renderState->dl++, static_tile_image);
 
+    u8 color = 0;
+
+    if (scene->fadeTimer < FADE_IN_TIME) {
+        color = 255 - (u8)(255.0f * scene->fadeTimer / FADE_IN_TIME);
+    }
+
+    gDPSetPrimColor(renderState->dl++, 255, 255, color, color, color, 255);
+
     if (!megatexturesRenderAll(&scene->tileCache, gLoadedLevel->megatextureIndexes, gLoadedLevel->megatextureIndexCount, &cameraInfo, renderState)) {
         return 0;
     }
 
-    sceneRenderDebug(scene, renderState);
+    // sceneRenderDebug(scene, renderState);
 
     return 1;
 }
@@ -94,6 +107,14 @@ void playerGetMoveBasis(struct Transform* transform, struct Vector3* forward, st
 #define ROTATE_SPEED    3.0f
 
 void sceneUpdate(struct Scene* scene) {
+    if (scene->fadeTimer > 0.0f) {
+        scene->fadeTimer -= FIXED_DELTA_TIME;
+
+        if (scene->fadeTimer < 0.0f) {
+            scene->fadeTimer = 0.0f;
+        }
+    }
+
     float frontToBack = 0.0f;
     float sideToSide = 0.0f;
 
@@ -112,6 +133,11 @@ void sceneUpdate(struct Scene* scene) {
     if (controllerGetButton(0, L_CBUTTONS)) {
         sideToSide -= MOVE_SPEED;
     }
+
+    OSContPad* pad2 = controllersGetControllerData(1);
+
+    frontToBack -= pad2->stick_y * (MOVE_SPEED * (1.0f / 80.0f));
+    sideToSide += pad2->stick_x * (MOVE_SPEED * (1.0f / 80.0f));
 
     struct Vector3 forward;
     struct Vector3 right;

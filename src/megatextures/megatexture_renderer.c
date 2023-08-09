@@ -17,7 +17,7 @@
 #define MT_MIN_TOTAL_TILE_REQUESTS  400
 #define MT_MAX_TILE_UNDER_LOADED    64
 
-#define MIN_PIXEL_AREA          0.000061035
+#define MIN_PIXEL_AREA          0.000015259
 
 #define MT_LOD_BIAS_START       1.5f
 #define MT_LOD_BIAS_STEP        (1.0f / 32.0f)
@@ -64,7 +64,7 @@ void megatextureDetermineMipLevels(struct MTUVBasis* uvBasis, float worldPixelWi
         // not needed but helpful for debugging
         mipPlanesOut[0] = cameraSpacePos.y;
 
-        *minLodOut = (int)ceilf(clampf(mipLevel, 0.0f, (float)mipPlaneCount));
+        *minLodOut = (int)floorf(clampf(mipLevel, 0.0f, (float)mipPlaneCount));
         *maxLodOut = *minLodOut;
         return;
     }
@@ -430,7 +430,7 @@ void megatexturesSort(struct SortInfo* values, struct SortInfo* tmp, int min, in
     int write = min;
 
     while (srcA < mid || srcB < max) {
-        if (srcB >= max || (srcA < mid && values[srcA].sortKey > values[srcB].sortKey)) {
+        if (srcB >= max || (srcA < mid && values[srcA].sortKey < values[srcB].sortKey)) {
             tmp[write++] = values[srcA++];
         } else {
             tmp[write++] = values[srcB++];
@@ -441,6 +441,8 @@ void megatexturesSort(struct SortInfo* values, struct SortInfo* tmp, int min, in
         values[i] = tmp[i];
     }
 }
+
+#define GROUP_SORT_OFFSET   1000.0f
 
 int megatexturesRenderAll(struct MTTileCache* tileCache, struct MTTileIndex* index, int count, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState) {
     megatextureRenderStart(tileCache);
@@ -464,7 +466,7 @@ int megatexturesRenderAll(struct MTTileCache* tileCache, struct MTTileIndex* ind
         struct Vector3 furthestPoint;
         box3DSupportFunction(&index[currentFace].boundingBox, &cameraInfo->forwardVector, &furthestPoint);
         furthestPoint.y = 0.0f;
-        sortInfo[currentSortFace].sortKey = vector3Dot(&furthestPoint, &cameraInfo->forwardVector);
+        sortInfo[currentSortFace].sortKey = index[currentFace].sortGroup * GROUP_SORT_OFFSET - vector3Dot(&furthestPoint, &cameraInfo->forwardVector);
         sortInfo[currentSortFace].index = currentFace;
         ++currentFace;
         ++currentSortFace;

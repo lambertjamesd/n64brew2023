@@ -22,4 +22,4 @@ convert texture_unpack/combined_textures.png -crop 1024x1024+3168+2112 texture_u
 convert texture_unpack/combined_textures.png -crop 1024x1024+0+3168 texture_unpack/benches.png
 convert texture_unpack/combined_textures.png -crop 1024x1024+1056+3168 texture_unpack/ceiling.png
 convert texture_unpack/combined_textures.png -crop 1024x1024+2112+3168 texture_unpack/wall_back.png
-convert texture_unpack/combined_textures.png -crop 1024x1024+3168+3168 -resize 512x512 texture_unpack/entry.png
+convert texture_unpack/combined_textures.png -crop 512x512+3168+3168 texture_unpack/entry.png
