@@ -56,6 +56,8 @@ u16* graphicsLayoutScreenBuffers(u16* memoryEnd) {
     fullscreenViewport.vp.vtrans[2] = G_MAXZ/4;
     fullscreenViewport.vp.vtrans[3] = 0;
 
+    osWritebackDCache(&fullscreenViewport, sizeof(fullscreenViewport));
+
     return (u16*)rdpOutput;
 }
 

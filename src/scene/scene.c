@@ -14,7 +14,9 @@
 
 #define PLAYER_RADIUS   0.125f
 #define PLAYER_HEAD_HEIGHT  3.0f
+#define PLAYER_CROUCH_HEAD_HEIGHT  1.5f
 #define PLAYER_HEAD_VELOCITY    3.0f
+#define GROUND_HEIGHT           0.0f
 
 #define GRAVITY     -9.8f
 
@@ -161,6 +163,8 @@ void sceneUpdate(struct Scene* scene) {
     scene->verticalVelocity += GRAVITY * FIXED_DELTA_TIME;
     scene->camera.transform.position.y += scene->verticalVelocity * FIXED_DELTA_TIME;
 
+    float headHeight = controllerGetButton(0, Z_TRIG) ? PLAYER_CROUCH_HEAD_HEIGHT : PLAYER_HEAD_HEIGHT;
+
     for (int i = 0; i < gLoadedLevel->collisionQuadCount; ++i) {
         collisionCollideSphere(&gLoadedLevel->collisionQuads[i], &scene->camera.transform.position, PLAYER_RADIUS);
 
@@ -168,16 +172,16 @@ void sceneUpdate(struct Scene* scene) {
         if (collisionCheckFloorHeight(&gLoadedLevel->collisionQuads[i], &scene->camera.transform.position, &contactPoint)) {
             float height = scene->camera.transform.position.y - contactPoint;
 
-            if (height < PLAYER_HEAD_HEIGHT) {
+            if (height < headHeight) {
                 scene->verticalVelocity = 0.0f;
-                scene->camera.transform.position.y = mathfMoveTowards(scene->camera.transform.position.y, contactPoint + PLAYER_HEAD_HEIGHT, PLAYER_HEAD_VELOCITY * FIXED_DELTA_TIME);
+                scene->camera.transform.position.y = mathfMoveTowards(scene->camera.transform.position.y, contactPoint + headHeight, PLAYER_HEAD_VELOCITY * FIXED_DELTA_TIME);
             }
         }
     }
 
-    if (scene->camera.transform.position.y < PLAYER_HEAD_HEIGHT) {
+    if (scene->camera.transform.position.y - GROUND_HEIGHT < headHeight) {
         scene->verticalVelocity = 0.0f;
-        scene->camera.transform.position.y = PLAYER_HEAD_HEIGHT;
+        scene->camera.transform.position.y = mathfMoveTowards(scene->camera.transform.position.y, headHeight + GROUND_HEIGHT, PLAYER_HEAD_VELOCITY * FIXED_DELTA_TIME);
     }
 
     if (controllerGetButtonDown(0, U_JPAD)) {

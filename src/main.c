@@ -116,7 +116,9 @@ struct SceneCallbacks gTestChamberCallbacks = {
 struct SceneCallbacks* gSceneCallbacks = &gTestChamberCallbacks;
 
 static void gameProc(void* arg) {
-    gameSettingsConfigure(!FORCE_4MB && (osMemSize >= 8 * 1024 * 1024));
+    int memSize = FORCE_4MB ? (4 * 1024 * 1024) : osMemSize;
+
+    gameSettingsConfigure(memSize >= 8 * 1024 * 1024);
 
     u8 schedulerMode = OS_VI_NTSC_LPF1;
 
@@ -124,9 +126,9 @@ static void gameProc(void* arg) {
 
 	switch (osTvType) {
 		case 0: // PAL
-			schedulerMode = gUseSettings.highRes ? OS_VI_PAL_HPF1 : OS_VI_PAL_LPF1;
+			schedulerMode = gUseSettings.highRes ? OS_VI_FPAL_HPF1 : OS_VI_FPAL_LPF1;
             gScreenWidth = gUseSettings.highRes ? 640 : 320;
-            gScreenHeight = gUseSettings.highRes ? 480 : 240;
+            gScreenHeight = gUseSettings.highRes ? 576 : 288;
             fps = 50;
 			break;
 		case 1: // NTSC
@@ -167,7 +169,7 @@ static void gameProc(void* arg) {
     u8 inputIgnore = 5;
     u8 drawingEnabled = 0;
 
-    u16* memoryEnd = graphicsLayoutScreenBuffers((u16*)PHYS_TO_K0(osMemSize));
+    u16* memoryEnd = graphicsLayoutScreenBuffers((u16*)PHYS_TO_K0(memSize));
 
     gAudioHeapBuffer = (u8*)memoryEnd - AUDIO_HEAP_SIZE;
 
@@ -191,6 +193,8 @@ static void gameProc(void* arg) {
 
     calculateBytesFree();
 
+    int memoryLeft = calculateBytesFree();
+
     while (1) {
         OSScMsg *msg = NULL;
         osRecvMesg(&gfxFrameMsgQ, (OSMesg*)&msg, OS_MESG_BLOCK);
@@ -199,7 +203,7 @@ static void gameProc(void* arg) {
             case (OS_SC_RETRACE_MSG):
                 // control the framerate
                 frameControl = (frameControl + 1) % (FRAME_SKIP + 1);
-                if (frameControl != 0) {
+                if (frameControl != 0 || !memoryLeft) {
                     break;
                 }
 

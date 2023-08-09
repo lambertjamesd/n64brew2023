@@ -839,7 +839,13 @@ local function can_cut_vertex_at_index(vertices, loop, loop_index)
     local current_index = loop_next_index(loop, next_loop_index)
     
     while current_index ~= prev_loop_index do
-        if is_point_contained(triangle_vertices, vertices[loop[current_index]]) then
+        local index = loop[current_index]
+
+        if index ~= loop[next_loop_index] and 
+            index ~= loop[loop_index] and 
+            index ~= loop[prev_loop_index] and 
+            is_point_contained(triangle_vertices, vertices[index]) 
+        then
             return false
         end
 
