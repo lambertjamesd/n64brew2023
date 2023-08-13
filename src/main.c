@@ -193,8 +193,6 @@ static void gameProc(void* arg) {
 
     calculateBytesFree();
 
-    int memoryLeft = calculateBytesFree();
-
     while (1) {
         OSScMsg *msg = NULL;
         osRecvMesg(&gfxFrameMsgQ, (OSMesg*)&msg, OS_MESG_BLOCK);
@@ -203,7 +201,7 @@ static void gameProc(void* arg) {
             case (OS_SC_RETRACE_MSG):
                 // control the framerate
                 frameControl = (frameControl + 1) % (FRAME_SKIP + 1);
-                if (frameControl != 0 || !memoryLeft) {
+                if (frameControl != 0) {
                     break;
                 }
 
