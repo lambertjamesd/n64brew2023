@@ -9,6 +9,8 @@
 
 #include "../controls/controller.h"
 
+#include "../build/src/audio/clips.h"
+
 #include "../util/time.h"
 #include "game_settings.h"
 
@@ -35,12 +37,16 @@ void sceneInit(struct Scene* scene) {
     mtTileCacheInit(&scene->tileCache, gUseSettings.tileCacheEntryCount);
 
     for (int i = 0; i < gLoadedLevel->megatextureIndexCount; ++i) {
-        megatexturePreload(&scene->tileCache, &gLoadedLevel->megatextureIndexes[i]);
+        megatexturePreload(&scene->tileCache, &gLoadedLevel->megatextureIndexes[i], gUseSettings.minTileAxisTileCount);
     }
 
     scene->verticalVelocity = 0.0f;
 
     scene->fadeTimer = FADE_IN_DELAY + FADE_IN_TIME;
+    
+    scene->leftChannel = soundPlayerPlay(SOUNDS_MUSIC_L, 0.0f, 0.5f, 0);
+    scene->rightChannel = soundPlayerPlay(SOUNDS_MUSIC_R, 0.0f, 0.5f, 127);
+    // scene->rightChannel = -1;
 }
 
 extern Vp fullscreenViewport;
@@ -115,6 +121,15 @@ void sceneUpdate(struct Scene* scene) {
         if (scene->fadeTimer < 0.0f) {
             scene->fadeTimer = 0.0f;
         }
+
+        float soundVolume = 1.0f - (scene->fadeTimer / (FADE_IN_DELAY + FADE_IN_TIME));
+        soundPlayerAdjustVolume(scene->rightChannel, soundVolume);
+        soundPlayerAdjustVolume(scene->leftChannel, soundVolume);
+    }
+
+    if (!soundPlayerIsPlaying(scene->rightChannel) && !soundPlayerIsPlaying(scene->leftChannel)) {
+        scene->leftChannel = soundPlayerPlay(SOUNDS_MUSIC_L, 1.0f, 0.5f, 0);
+        scene->rightChannel = soundPlayerPlay(SOUNDS_MUSIC_R, 1.0f, 0.5f, 127);
     }
 
     float frontToBack = 0.0f;

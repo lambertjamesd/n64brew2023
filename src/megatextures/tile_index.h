@@ -35,7 +35,7 @@ struct MTImageLayer {
     u64* tileSource;
     u8 xTiles;
     u8 yTiles;
-    u8 isAlwaysLoaded;
+    u8 maxTileAxisTileCount;
 };
 
 struct MTTileIndex {

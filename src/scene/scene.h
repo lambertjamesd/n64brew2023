@@ -8,11 +8,15 @@
 #include "../graphics/graphics.h"
 #include "../megatextures/megatexture_tilecache.h"
 
+#include "../audio/soundplayer.h"
+
 struct Scene {
     struct Camera camera;
     struct MTTileCache tileCache;
     float verticalVelocity;
     float fadeTimer;
+    ALSndId leftChannel;
+    ALSndId rightChannel;
 };
 
 void sceneInit(struct Scene* scene);

@@ -9,6 +9,7 @@ void gameSettingsConfigure(int hasExpansion) {
     gUseSettings.tileCacheEntryCount = hasExpansion ? 2048 : 1024;
     gUseSettings.highRes = hasExpansion ? 1 : 0;
     gUseSettings.minLodBias = hasExpansion ? 0.0f : 0.0f;
+    gUseSettings.minTileAxisTileCount = hasExpansion ? 4 : 2;
 
     gMtMinLoadBias = gUseSettings.minLodBias;
 }

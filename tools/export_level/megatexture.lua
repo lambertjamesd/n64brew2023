@@ -1101,7 +1101,7 @@ local function write_tile_index(world_mesh, megatexture_model, sort_group)
             tileSource = get_tiles_reference(layer),
             xTiles = layer.tile_count_x,
             yTiles = layer.tile_count_y,
-            isAlwaysLoaded = layer.tile_count_x <= 2 and layer.tile_count_y <= 2,
+            maxTileAxisTileCount = math.max(layer.tile_count_x, layer.tile_count_y),
         })
     end
 

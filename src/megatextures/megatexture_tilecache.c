@@ -4,7 +4,7 @@
 
 #define LARGE_PRIME_NUMBER  1160939981
 
-int gMtMaxTileRequestsPerFrame = 64;
+int gMtMaxTileRequestsPerFrame = 56;
 
 Gfx mtNopDisplayList[] = {gsSPEndDisplayList()};
 

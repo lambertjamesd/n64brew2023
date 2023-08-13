@@ -143,7 +143,15 @@ build/src/levels/level_list.o: build/assets/world/level_list.h
 ## Sounds
 ####################
 
-SOUND_CLIPS = $(shell find assets/ -type f -name '*.ins') $(shell find assets/ -type f -name '*.wav')
+build/assets/sounds/music_r.aifc build/assets/sounds/music_l.aifc: assets/sounds/music.mp3
+	@mkdir -p $(@D)
+	mpg123 -w build/assets/sounds/music.wav assets/sounds/music.mp3
+	sox build/assets/sounds/music.wav -r 44100 build/assets/sounds/music_r.wav remix 1 
+	sox build/assets/sounds/music.wav -r 44100 build/assets/sounds/music_l.wav remix 2 
+	$(SFZ2N64) -o build/assets/sounds/music_r.aifc build/assets/sounds/music_r.wav
+	$(SFZ2N64) -o build/assets/sounds/music_l.aifc build/assets/sounds/music_l.wav
+
+SOUND_CLIPS = build/assets/sounds/music_r.aifc build/assets/sounds/music_l.aifc
 
 build/assets/sound/sounds.sounds build/assets/sound/sounds.sounds.tbl: $(SOUND_CLIPS)
 	@mkdir -p $(@D)
@@ -156,8 +164,7 @@ build/src/audio/clips.h: tools/generate_sound_ids.js $(SOUND_CLIPS)
 	@mkdir -p $(@D)
 	node tools/generate_sound_ids.js -o $@ -p SOUNDS_ $(SOUND_CLIPS)
 
-build/src/audio/clips.o: build/src/audio/clips.h
-build/src/decor/decor_object_list.o: build/src/audio/clips.h
+build/src/scene/scene.o: build/src/audio/clips.h
 
 ####################
 ## Linking

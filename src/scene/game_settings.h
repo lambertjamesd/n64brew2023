@@ -6,6 +6,7 @@ struct GameSettings {
     int tileCacheEntryCount;
     int highRes;
     float minLodBias;
+    int minTileAxisTileCount;
 };
 
 extern struct GameSettings gUseSettings;

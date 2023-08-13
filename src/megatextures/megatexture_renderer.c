@@ -341,11 +341,11 @@ int megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, 
     return 1;
 }
 
-void megatexturePreload(struct MTTileCache* tileCache, struct MTTileIndex* index) {
+void megatexturePreload(struct MTTileCache* tileCache, struct MTTileIndex* index, int minTileAxisTileCount) {
     for (int layerIndex = 0; layerIndex < index->layerCount; ++layerIndex) {
         struct MTImageLayer* layer = &index->imageLayers[layerIndex];
 
-        if (!layer->isAlwaysLoaded) {
+        if (layer->maxTileAxisTileCount > minTileAxisTileCount) {
             continue;
         }
 

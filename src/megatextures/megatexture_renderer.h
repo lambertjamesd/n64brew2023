@@ -11,7 +11,7 @@ extern float gMtMinLoadBias;
 
 void megatextureRenderStart(struct MTTileCache* tileCache);
 int megatextureRender(struct MTTileCache* tileCache, struct MTTileIndex* index, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState);
-void megatexturePreload(struct MTTileCache* tileCache, struct MTTileIndex* index);
+void megatexturePreload(struct MTTileCache* tileCache, struct MTTileIndex* index, int minTileAxisTileCount);
 void megatextureRenderEnd(struct MTTileCache* tileCache, int success);
 
 int megatexturesRenderAll(struct MTTileCache* tileCache, struct MTTileIndex* index, int count, struct CameraMatrixInfo* cameraInfo, struct RenderState* renderState);
