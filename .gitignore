@@ -5,25 +5,11 @@
 *.z64
 *.blend1
 
-lua-5.4.4/
-
 build/
 debugger
 gfxvalidator
-assets_working/
-vpk/
-portal_pak_dir/
-portal_pak_modified/
-
-tools/skeletool64
-tools/vtf2png
-
-skelatool64/*.zip
 
 src/controls/controller-data.h
-
-# exclude images until the end of the jam
-assets/materials/megatextures
 
 world_high_res/
 
