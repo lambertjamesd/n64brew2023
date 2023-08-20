@@ -26,7 +26,7 @@
 #define FADE_IN_TIME    2.0f
 
 void sceneInit(struct Scene* scene) {
-    cameraInit(&scene->camera, 70.0f, 0.125f * SCENE_SCALE, 20.0f * SCENE_SCALE);
+    cameraInit(&scene->camera, 70.0f, 0.05f * SCENE_SCALE, 20.0f * SCENE_SCALE);
 
     scene->camera.transform.position.x = 0.0f;
     scene->camera.transform.position.y = PLAYER_HEAD_HEIGHT;
