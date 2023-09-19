@@ -187,6 +187,26 @@ void sceneUpdate(struct Scene* scene) {
     struct Quaternion tempRotation;
     quatMultiply(&deltaRotate, &scene->camera.transform.rotation, &tempRotation);
 
+    // Define a threshold for the comparison (adjust this value as needed)
+    float upThreshold = 0.99f; // This value should be close to 1.0 for a strict check
+
+    // Calculate the camera's forward direction in world space
+    struct Vector3 cameraForward;
+    quatRotate(&scene->camera.transform.rotation, &gForward, &cameraForward);
+    
+    // Prevent camera from "rolling over"
+    if (cameraForward.y >= upThreshold) {
+        // Camera is pointing down
+        if (stickY <= 0) {
+            stickY = 0.0f; // Disable downward movement
+        }
+    } else if (-cameraForward.y >= upThreshold) {
+        // Camera is pointing up
+        if (stickY >= 0) {
+            stickY = 0.0f; // Disable upward movement
+        }
+    }
+
     // pitch
     quatAxisAngle(&gRight, stickY * ROTATE_SPEED * FIXED_DELTA_TIME * (1.0f / 80.0f), &deltaRotate);
     quatMultiply(&tempRotation, &deltaRotate, &scene->camera.transform.rotation);
